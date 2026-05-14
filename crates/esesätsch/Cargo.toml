@@ -1,6 +1,6 @@
 [package]
 name        = "esesaetsch"
-version     = "0.1.0"   # kept in lock-step with crates/esesätsch-core by release-please
+version     = "0.2.0"   # kept in lock-step with crates/esesätsch-core by release-please
 edition.workspace      = true
 rust-version.workspace = true
 license.workspace      = true
