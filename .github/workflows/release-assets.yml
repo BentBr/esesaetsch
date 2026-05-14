@@ -57,7 +57,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
+      # @nightly matches rust-toolchain.toml — the `targets:` parameter
+      # only adds the target to the toolchain it installs, so it must
+      # match the one cargo will actually run under.
+      - uses: dtolnay/rust-toolchain@nightly
         with:
           targets: ${{ matrix.target }}
 
@@ -69,10 +72,7 @@ jobs:
 
       - name: Install build deps (Linux ARM64 cross)
         if: matrix.install == 'linux-arm'
-        run: |
-          sudo dpkg --add-architecture arm64
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu libclang-dev libpam0g-dev:arm64
+        run: ./.github/scripts/install-linux-arm-deps.sh
 
       - name: Install build deps (macOS)
         if: matrix.install == 'macos'

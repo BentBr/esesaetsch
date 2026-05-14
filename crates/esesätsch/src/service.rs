@@ -52,11 +52,10 @@ pub fn uninstall() -> Result<()> {
 
 #[cfg(target_os = "linux")]
 fn install_impl(binary: &Path, config: Option<&Path>) -> Result<()> {
-    let exec_start = if let Some(cfg) = config {
-        format!("{} serve --config {}", binary.display(), cfg.display())
-    } else {
-        format!("{} serve", binary.display())
-    };
+    let exec_start = config.map_or_else(
+        || format!("{} serve", binary.display()),
+        |cfg| format!("{} serve --config {}", binary.display(), cfg.display()),
+    );
     let unit = format!(
         "[Unit]\n\
          Description=esesätsch SSH server\n\

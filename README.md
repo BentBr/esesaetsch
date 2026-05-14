@@ -41,24 +41,61 @@ ssh -p 2222 alice@127.0.0.1
 
 Pre-1.0 — the wire protocol is implemented and tested against the real `russh` client, but the package isn't on crates.io yet and the API surface may still shift between 0.x minor releases. See the [CHANGELOG](CHANGELOG.md) for what landed in each version.
 
-## Quick start
+## Getting started
 
-1. Install Rust nightly (`rustup default nightly` — pinned via `rust-toolchain.toml`).
-2. Install build-time deps (PAM bindings need `libclang`):
-   - **macOS**: `brew install llvm`, then `export LIBCLANG_PATH=/opt/homebrew/opt/llvm/lib DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/opt/llvm/lib`.
-   - **Linux**: `sudo apt-get install -y libpam0g-dev libclang-dev`.
-   - **Windows**: no extra prerequisites.
-3. Build:
-   ```sh
-   cargo build --release
-   ```
-4. Generate a host key, write a config, and start the server:
-   ```sh
-   ./target/release/esesätsch gen-key --host-key ./host_key
-   cp examples/minimal.toml ./config.toml
-   # …add your public key to [auth.authorized_keys]…
-   ./target/release/esesätsch serve --config ./config.toml
-   ```
+### 1. Download a pre-built binary
+
+Grab the archive for your platform from the [latest release](https://github.com/BentBr/esesaetsch/releases/latest). Asset filenames follow the pattern `esesätsch-<version>-<target>.<ext>`:
+
+| Platform | Asset |
+|---|---|
+| Linux x86_64 | `esesätsch-<version>-x86_64-unknown-linux-gnu.tar.gz` |
+| Linux ARM64 | `esesätsch-<version>-aarch64-unknown-linux-gnu.tar.gz` |
+| macOS Apple Silicon | `esesätsch-<version>-aarch64-apple-darwin.tar.gz` |
+| Windows x86_64 | `esesätsch-<version>-x86_64-pc-windows-msvc.zip` |
+| Windows ARM64 | `esesätsch-<version>-aarch64-pc-windows-msvc.zip` |
+
+Each archive contains the `esesätsch` binary plus `LICENSE`, `NOTICE`, and `README.md`.
+
+### 2. Extract and put it on your `$PATH`
+
+```sh
+# Linux / macOS
+tar -xzf esesätsch-v0.1.0-aarch64-apple-darwin.tar.gz
+sudo install -m 0755 esesätsch-v0.1.0-aarch64-apple-darwin/esesätsch /usr/local/bin/
+
+# Windows (PowerShell)
+Expand-Archive esesätsch-v0.1.0-x86_64-pc-windows-msvc.zip
+# Move esesätsch.exe somewhere on %PATH%
+```
+
+### 3. Generate a host key, write a config, run
+
+```sh
+# One-time: generate the server's host key
+esesätsch gen-key --host-key ./host_key
+
+# Copy a starting-point config and add your SSH public key under
+# [auth.authorized_keys]
+curl -O https://raw.githubusercontent.com/BentBr/esesaetsch/main/examples/minimal.toml
+mv minimal.toml config.toml
+$EDITOR config.toml
+
+# Start the server
+esesätsch serve --config ./config.toml
+```
+
+### 4. Connect
+
+```sh
+ssh -p 2222 <your-username>@<host>
+```
+
+See [`docs/user-guide/configuration.md`](docs/user-guide/configuration.md) for every config field and [`docs/user-guide/cli-reference.md`](docs/user-guide/cli-reference.md) for every CLI flag.
+
+### Building from source
+
+Want to build from a checkout instead of using a release binary? See [`docs/development.md`](docs/development.md) — it covers Rust nightly, the `libclang` setup for PAM, the strict clippy/test/fmt commands, and the release workflow.
 
 ## Documentation
 

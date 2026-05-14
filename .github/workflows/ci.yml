@@ -122,11 +122,15 @@ jobs:
   # ============================================================================
   # Cross-platform release builds (5 targets)
   # ============================================================================
+  # NB: cross-build jobs use @nightly because rust-toolchain.toml pins
+  # nightly. dtolnay/rust-toolchain's `targets:` adds the target to the
+  # toolchain it installs — if that's stable but cargo runs as nightly,
+  # the target's std isn't available.
   build-linux-x64:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
         with:
           targets: x86_64-unknown-linux-gnu
       - uses: Swatinem/rust-cache@v2
@@ -138,15 +142,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
         with:
           targets: aarch64-unknown-linux-gnu
       - uses: Swatinem/rust-cache@v2
-      - name: Install cross-toolchain + PAM
-        run: |
-          sudo dpkg --add-architecture arm64
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu libclang-dev libpam0g-dev:arm64
+      - name: Install cross-toolchain + PAM (arm64)
+        run: ./.github/scripts/install-linux-arm-deps.sh
       - name: Build
         env:
           PKG_CONFIG_ALLOW_CROSS: "1"
@@ -156,7 +157,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
         with:
           targets: aarch64-apple-darwin
       - uses: Swatinem/rust-cache@v2
@@ -172,7 +173,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
         with:
           targets: x86_64-pc-windows-msvc
       - uses: Swatinem/rust-cache@v2
@@ -182,7 +183,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
         with:
           targets: aarch64-pc-windows-msvc
       - uses: Swatinem/rust-cache@v2
