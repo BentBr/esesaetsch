@@ -103,7 +103,12 @@ jobs:
         env:
           LIBCLANG_PATH: /opt/homebrew/opt/llvm/lib
           DYLD_FALLBACK_LIBRARY_PATH: /opt/homebrew/opt/llvm/lib
-        run: cargo +nightly clippy --workspace --all-targets -- -D clippy::all -D warnings -D clippy::pedantic -D clippy::nursery
+        # No `+nightly` selector here (unlike the linux + windows clippy jobs):
+        # the macos-latest arm runner's cargo on PATH resolves to a bootstrap
+        # shim that errors on `+TOOLCHAIN` syntax. The dtolnay action above
+        # installed nightly as the default toolchain, so plain `cargo clippy`
+        # picks up nightly correctly.
+        run: cargo clippy --workspace --all-targets -- -D clippy::all -D warnings -D clippy::pedantic -D clippy::nursery
 
   clippy-windows-x64:
     runs-on: windows-latest

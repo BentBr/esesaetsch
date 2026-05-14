@@ -240,10 +240,12 @@ fn kill_pid(pid: u32) -> io::Result<()> {
 }
 
 #[cfg(windows)]
-fn kill_pid(_pid: u32) -> io::Result<()> {
-    // Will be wired through the `windows` crate's TerminateProcess in a
-    // follow-up. For now this is a best-effort no-op on Windows; the
-    // child will exit when the PTY's master closes.
+// Signature mirrors the Unix `kill_pid` so callers don't need cfg branches.
+// Will be wired through the `windows` crate's TerminateProcess in a follow-up;
+// for now this is a best-effort no-op — the child will exit when the PTY's
+// master closes.
+#[allow(clippy::unnecessary_wraps)]
+const fn kill_pid(_pid: u32) -> io::Result<()> {
     Ok(())
 }
 

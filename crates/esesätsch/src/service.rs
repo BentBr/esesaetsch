@@ -150,14 +150,16 @@ fn uninstall_impl() -> Result<()> {
 }
 
 #[cfg(target_os = "windows")]
+// Signature mirrors the Linux/macOS `install_impl` so the caller doesn't
+// branch on platform. The Windows arm is currently always-Ok because we
+// only print sc.exe instructions; native registration is a follow-up.
+#[allow(clippy::unnecessary_wraps)]
 fn install_impl(binary: &Path, config: Option<&Path>) -> Result<()> {
-    // Native Windows service registration via the `windows-service` crate
-    // is a follow-up. For now print the manual `sc.exe` command.
     let bin = binary.display();
-    let bin_path = match config {
-        Some(c) => format!("\"{bin}\" serve --config \"{}\"", c.display()),
-        None => format!("\"{bin}\" serve"),
-    };
+    let bin_path = config.map_or_else(
+        || format!("\"{bin}\" serve"),
+        |c| format!("\"{bin}\" serve --config \"{}\"", c.display()),
+    );
     println!("native registration is not yet wired; run as an Administrator:");
     println!(
         "    sc.exe create esesaetsch binPath= \"{bin_path}\" start= auto DisplayName= \"esesätsch SSH server\""
@@ -168,6 +170,8 @@ fn install_impl(binary: &Path, config: Option<&Path>) -> Result<()> {
 }
 
 #[cfg(target_os = "windows")]
+// Same shape as install_impl — see comment above.
+#[allow(clippy::unnecessary_wraps)]
 fn uninstall_impl() -> Result<()> {
     println!("run as an Administrator:");
     println!("    sc.exe stop esesaetsch");
@@ -189,10 +193,11 @@ fn require_privilege() -> Result<()> {
 }
 
 #[cfg(windows)]
-fn require_privilege() -> Result<()> {
-    // Cheap heuristic: try to read a file only Administrators can read.
-    // Real `IsUserAnAdmin` lives behind the `windows` crate's shell
-    // module; we keep the check simple here and let downstream file
-    // writes provide the definitive failure.
+// Signature mirrors the Unix arm so the caller is platform-agnostic. Real
+// `IsUserAnAdmin` lives behind the `windows` crate's shell module; we keep
+// the check simple here and let downstream file writes provide the
+// definitive failure.
+#[allow(clippy::unnecessary_wraps)]
+const fn require_privilege() -> Result<()> {
     Ok(())
 }
