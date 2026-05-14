@@ -1,6 +1,11 @@
 # esesätsch documentation
 
-This index is filled out fully in plan 4. For now:
+A strict, cross-platform SSH server written in Rust.
 
-- [Design spec](superpowers/specs/2026-05-14-esesaetsch-ssh-server-design.md)
-- [Plan 1: Foundation](superpowers/plans/2026-05-14-esesaetsch-plan-1-foundation.md)
+This documentation hub will be filled out in a later development pass. For
+now, refer to:
+
+- The [root `README.md`](../README.md) for status, install, and quick-start.
+- The crate-level rustdoc (`cargo doc --open -p esesaetsch-core`) for the
+  authoritative reference on every public type and function.
+- The `LICENSE` and `NOTICE` files at the repo root for licensing terms.

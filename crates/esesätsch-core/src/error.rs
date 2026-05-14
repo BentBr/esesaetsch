@@ -2,8 +2,12 @@
 //!
 //! Every fallible operation returns a domain-specific `*Error` enum.
 //! `Error` is the top-level wrapper used at the `lib.rs` surface.
-//! `Display` output is intended for operator logs only — it must never
-//! be returned to an SSH client (see spec §6.4).
+//!
+//! **Operator-only.** `Display` output is intended for server-side logs;
+//! it must never reach the SSH client wire. The handler converts every
+//! domain-specific failure into a uniform `Auth::Reject` (or, post-auth,
+//! into `exit-status = 1` with no diagnostic bytes) before anything goes
+//! out over the channel.
 
 use thiserror::Error;
 
@@ -95,9 +99,9 @@ pub enum CertError {
 
 /// Errors arising from authentication attempts.
 ///
-/// **Operator-only.** This is for server-side logs. Per spec §6.4 it must
-/// never reach the SSH client wire — the wire response is always a uniform
-/// `Auth::Reject` with no detail.
+/// **Operator-only.** This is for server-side logs; the wire response is
+/// always a uniform `Auth::Reject` with no detail (see the crate-level
+/// information-disclosure note).
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum AuthError {
     /// User is not present in the allowlist (pubkey) / not known to the OS (password).
@@ -117,8 +121,8 @@ pub enum AuthError {
 
 /// Errors arising from spawning a child process / PTY.
 ///
-/// Operator-only. Per spec §6.4 rule 6, the client only sees
-/// `exit-status = 1` and a closed channel — no detail.
+/// Operator-only. On spawn failure the client only sees
+/// `exit-status = 1` and a closed channel — never any diagnostic bytes.
 #[derive(Debug, Error)]
 pub enum SpawnError {
     /// The target OS user does not exist.

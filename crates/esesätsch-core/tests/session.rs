@@ -1,4 +1,4 @@
-//! End-to-end session lifecycle tests (spec §8, §11.1 session scenarios).
+//! End-to-end session lifecycle tests.
 //!
 //! These boot the real server, connect a real russh client, open a
 //! session channel, drive it through shell/command/pty/data/exit, and
@@ -233,8 +233,8 @@ async fn window_change_propagates_to_pty_resize() {
 
 #[tokio::test]
 async fn client_disconnect_kills_the_child() {
-    // Spec §8: when the client closes the channel / drops the connection,
-    // the server-side session task calls `PtyChild::kill` so the child
+    // When the client closes the channel / drops the connection, the
+    // server-side session task calls `PtyChild::kill` so the child
     // doesn't outlive the session.
     let spawner = Arc::new(MockPtySpawner::new());
     spawner.set_config(MockChildConfig {
@@ -282,9 +282,9 @@ async fn client_disconnect_kills_the_child() {
 
 #[tokio::test]
 async fn spawn_failure_emits_exit_status_one_with_no_stderr() {
-    // Spec §6.4 rule 6: when the spawner errors, the client sees
-    // exit-status=1 and the channel closes — no stderr description ever
-    // crosses the wire.
+    // When the spawner errors, the client sees `exit-status=1` and the
+    // channel closes — no stderr description ever crosses the wire (the
+    // operator-side reason is only in the server log).
     let spawner = Arc::new(MockPtySpawner::new());
     spawner.set_config(MockChildConfig {
         spawn_error: Some("simulated PrivilegeDenied".to_owned()),

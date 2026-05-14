@@ -157,7 +157,7 @@ async fn pubkey_disabled_rejects_even_with_valid_key() {
 #[tokio::test]
 async fn server_banner_does_not_leak_version_or_os() {
     // Open a raw TCP connection to the server and read the SSH banner
-    // line directly to assert it matches spec §6.4 rule 4.
+    // line directly to assert it carries no version/OS/hostname.
     use tokio::io::AsyncReadExt;
     let (server, _user_key) = TestServer::with_default_users().await;
     let mut s = tokio::net::TcpStream::connect(server.bound_addr)
@@ -179,9 +179,9 @@ async fn server_banner_does_not_leak_version_or_os() {
 
 #[tokio::test]
 async fn server_drops_connection_after_max_auth_attempts() {
-    // Spec §6.1 step 3: after `max_auth_attempts` failed attempts, the
-    // server drops the connection. Our `TestServer::with_default_users`
-    // uses the built-in default of 3.
+    // After `max_auth_attempts` failed attempts, the server drops the
+    // connection. `TestServer::with_default_users` uses the built-in
+    // default of 3.
     let (server, _user_key) = TestServer::with_default_users().await;
     let mut handle = connect(&server).await;
 

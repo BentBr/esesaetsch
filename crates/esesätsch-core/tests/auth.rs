@@ -1,4 +1,6 @@
-//! Integration tests for the auth trait surfaces (spec §6.3, §6.4).
+//! Integration tests for the auth trait surfaces, including the
+//! constant-time / sentinel-compare hygiene path on the central
+//! allowlist authenticator.
 
 mod common;
 

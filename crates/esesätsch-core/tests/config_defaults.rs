@@ -1,4 +1,4 @@
-//! Tests for the built-in default config (spec §5.5).
+//! Tests for the built-in default config.
 //!
 //! When no config file and no CLI overrides are provided, `Config::defaults()`
 //! returns the documented default values.

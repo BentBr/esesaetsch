@@ -5,8 +5,8 @@
 //! 2. `TomlConfig` — derived from `serde`, populated by `toml::from_str`.
 //! 3. `Config`     — the merged, validated, ready-to-use config.
 //!
-//! `Config::from_sources` (Task 8) is a pure function: it performs no I/O.
-//! `Config::validate` (Task 9) enforces every rule in spec §5.4.
+//! `Config::from_sources` is a pure function: it performs no I/O.
+//! `Config::validate` enforces every invariant after merge.
 
 use std::collections::BTreeMap;
 use std::net::{IpAddr, SocketAddr};
@@ -167,8 +167,8 @@ impl Config {
         Ok(out)
     }
 
-    /// Built-in defaults (spec §5.5). Returned by the merge layer when no
-    /// TOML file is supplied and no CLI flag overrides a given field.
+    /// Built-in defaults. Returned by the merge layer when no TOML file
+    /// is supplied and no CLI flag overrides a given field.
     #[must_use]
     pub fn defaults() -> Self {
         Self {

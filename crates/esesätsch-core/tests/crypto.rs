@@ -1,13 +1,14 @@
-//! Tests that the compiled-in crypto allowlist matches spec §7 exactly.
-//! Any change to the policy is a code change in `crypto.rs` and must
-//! flow through these tests.
+//! Tests that pin down the compiled-in crypto allowlist. Any change to
+//! the policy is a code change in `crypto.rs` and must flow through
+//! these tests.
 
 use esesaetsch_core::crypto::{CIPHERS, COMPRESSION, HOST_KEY_ALGORITHMS, KEX_ALGORITHMS, MACS};
 
 #[test]
 fn kex_algorithms_match_spec() {
-    // sntrup761x25519-sha512@openssh.com is in the spec but absent from
-    // russh 0.45; tracked via TODO in crypto.rs.
+    // sntrup761x25519-sha512@openssh.com (post-quantum hybrid) is a
+    // desired entry but absent from russh 0.45; tracked via TODO in
+    // crypto.rs.
     assert_eq!(
         KEX_ALGORITHMS,
         &["curve25519-sha256", "curve25519-sha256@libssh.org"]
@@ -21,7 +22,7 @@ fn host_key_algorithms_match_spec() {
 
 #[test]
 fn ciphers_match_spec() {
-    // aes128-gcm@openssh.com is in the spec but absent from russh 0.45.
+    // aes128-gcm@openssh.com is desired but absent from russh 0.45.
     assert_eq!(
         CIPHERS,
         &["chacha20-poly1305@openssh.com", "aes256-gcm@openssh.com"]

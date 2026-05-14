@@ -76,8 +76,8 @@ impl PasswordAuthenticator for MockPasswordAuthenticator {
             || {
                 // Simulate the bcrypt-cost dummy work that a real backend
                 // would perform to equalise timing between unknown-user and
-                // bad-password (spec §6.4 rule 3). Tests assert on this
-                // counter to verify the structural-hygiene property.
+                // bad-password. Tests assert on this counter to verify the
+                // structural-hygiene property.
                 self.dummy_work_count.fetch_add(1, Ordering::Relaxed);
                 Err(AuthError::UnknownUser)
             },

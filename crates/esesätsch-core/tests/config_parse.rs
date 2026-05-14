@@ -1,5 +1,5 @@
 //! Top-level surface tests: the public types exist with the expected fields
-//! and the TOML examples from spec §5.3 parse without error.
+//! and representative TOML inputs parse without error.
 
 use esesaetsch_core::config::{AuthConfig, CaConfig, LoggingConfig, ServerConfig, TomlConfig};
 

@@ -2,7 +2,7 @@
 //!
 //! `russh::server::Server` and `russh::server::Handler` implementations
 //! that dispatch incoming auth requests to our trait objects, and apply
-//! spec §6.4 information-disclosure hygiene to every wire-level response.
+//! information-disclosure hygiene to every wire-level response.
 //!
 //! Channel/session methods run a [`crate::session::run`] task per opened
 //! channel that bridges the spawned `PtyChild` to the russh wire protocol.
@@ -60,7 +60,8 @@ impl EsesätschServer {
         let methods = advertised_methods(&config);
 
         let russh_config = RusshConfig {
-            // Spec §6.4 rule 4: server-id reveals no minor/patch/OS/hostname.
+            // Server identification string reveals no minor/patch, no OS,
+            // no hostname — defence against fingerprinting.
             server_id: SshId::Standard("SSH-2.0-esesaetsch_0".to_owned()),
             methods,
             keys: vec![host_key],
@@ -138,7 +139,10 @@ pub struct ConnectionHandler {
 }
 
 impl ConnectionHandler {
-    /// Build the uniform reject response. Spec §6.4 rule 1 + rule 2.
+    /// Build the uniform reject response. The `proceed_with_methods` list
+    /// is computed from server config only — never from per-user state —
+    /// so it can't be used to probe which methods are configured for a
+    /// given username.
     fn uniform_reject(&self) -> Auth {
         Auth::Reject {
             proceed_with_methods: Some(advertised_methods(&self.state.config)),
@@ -153,7 +157,9 @@ impl ConnectionHandler {
     }
 
     /// Build a `SpawnSpec`, call the spawner, and launch a session task.
-    /// On spawn-failure: spec §6.4 rule 6 (exit-status=1, no stderr to wire).
+    /// On spawn-failure: client sees `exit-status = 1` and a closed
+    /// channel, with no diagnostic bytes — the operator-side reason is
+    /// only in the server log.
     fn launch_session(
         &mut self,
         channel_id: ChannelId,

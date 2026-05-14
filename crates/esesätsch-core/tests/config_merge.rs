@@ -1,4 +1,4 @@
-//! Precedence: CLI > TOML > defaults (spec §5.1).
+//! Precedence: CLI > TOML > defaults.
 //!
 //! Each test covers one merge precedence rule.
 

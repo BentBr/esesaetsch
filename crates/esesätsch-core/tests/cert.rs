@@ -1,5 +1,5 @@
-//! Integration tests for OpenSSH cert authentication (spec §6.1 cert path,
-//! §6.4 cert hygiene, §11.1 cert scenarios).
+//! Integration tests for OpenSSH cert authentication — full validation
+//! pipeline plus the dummy-work hygiene counter on each rejection branch.
 
 mod common;
 

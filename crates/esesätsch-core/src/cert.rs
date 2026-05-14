@@ -1,4 +1,4 @@
-//! OpenSSH certificate authentication (spec §6.1 cert path, §6.4 cert hygiene).
+//! OpenSSH certificate authentication.
 //!
 //! This module parses and validates OpenSSH user certificates. Validation is
 //! performed in this order:
@@ -16,14 +16,17 @@
 //! 7. **Revocation** — the cert's serial must not be in the configured
 //!    revocation list.
 //! 8. **Critical options** — any critical option name we don't recognise
-//!    causes rejection (OpenSSH cert spec: unknown critical options MUST be
-//!    fail-closed). Supported: `force-command`. Anything else rejected.
+//!    causes rejection (per the OpenSSH cert format: unknown critical
+//!    options MUST be fail-closed). Supported: `force-command`. Anything
+//!    else rejected.
 //!
-//! Information-disclosure hygiene (spec §6.4 rule 3): when validation fails
-//! at any step, the implementation still completes structurally equivalent
-//! work — parse + constant-time CA-compare on a sentinel input. A counter
-//! exposed via [`CaTrustCertAuthenticator::dummy_work_count`] lets tests
-//! assert on this without relying on wall-clock timing.
+//! ## Information-disclosure hygiene
+//!
+//! When validation fails at any step, the implementation still completes
+//! structurally equivalent work — parse + constant-time CA-compare on a
+//! sentinel input. A counter exposed via
+//! [`CaTrustCertAuthenticator::dummy_work_count`] lets tests assert on
+//! this without relying on wall-clock timing.
 
 use std::collections::BTreeSet;
 use std::sync::Arc;
@@ -118,7 +121,7 @@ pub trait CertAuthenticator: Send + Sync {
     ///
     /// Returns `AuthError::CredentialMismatch` on any validation failure.
     /// The operator-side reason is logged separately, never sent over the
-    /// wire — spec §6.4.
+    /// wire (see the crate-level information-disclosure note).
     fn verify(&self, user: &str, cert: &ParsedCert) -> Result<CertGrants, AuthError>;
 }
 

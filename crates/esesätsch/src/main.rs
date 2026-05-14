@@ -119,7 +119,7 @@ fn cmd_serve(args: &Args) -> Result<()> {
     cfg.validate().context("validating config")?;
 
     println!(
-        "serve: would listen on {} (full server arrives in plan 2)",
+        "serve: would listen on {} (full server wiring not yet hooked in this binary)",
         cfg.bind,
     );
     Ok(())

@@ -1,4 +1,5 @@
-//! Validation rules from spec §5.4. Each test is a single rule.
+//! Validation invariants enforced by `Config::validate`. Each test is a
+//! single rule.
 
 use esesaetsch_core::config::Config;
 use esesaetsch_core::error::ConfigError;

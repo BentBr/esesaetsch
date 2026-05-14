@@ -10,8 +10,6 @@ Pre-release. See `docs/index.md` for documentation.
 
 Documentation hub: [`docs/index.md`](docs/index.md).
 
-Once auth + session land (plan 2):
-
 ```sh
 cargo run --release -- gen-key --host-key ./host_key
 cargo run --release -- serve --config ./config.toml --port 2222

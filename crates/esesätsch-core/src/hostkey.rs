@@ -1,4 +1,5 @@
-//! Host-key load/generate operations (spec §5.5, §6.1, subcommand `gen-key`).
+//! Host-key load/generate operations (used by the `gen-key` subcommand and
+//! by the server's startup path).
 //!
 //! v1 generates Ed25519 keys. The `russh-keys` crate provides parsing of
 //! the OpenSSH on-disk format.

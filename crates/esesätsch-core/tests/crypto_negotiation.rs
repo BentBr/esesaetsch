@@ -1,5 +1,4 @@
-//! Wire-level negotiation tests for the compiled-in crypto allowlist
-//! (spec §7, §11.1 crypto scenarios).
+//! Wire-level negotiation tests for the compiled-in crypto allowlist.
 //!
 //! For each allowed algorithm slot (KEX, cipher, MAC, compression) we
 //! constrain the russh **client** to a single algorithm and verify the

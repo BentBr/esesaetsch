@@ -1,10 +1,10 @@
-//! PTY abstraction (spec §6.3 trait surface, §8 session lifecycle).
+//! PTY abstraction.
 //!
 //! The library defines abstract traits — `PtySpawner` + `PtyChild` — so the
 //! protocol/session logic can be tested in `esesaetsch-core` without ever
 //! touching the host OS. Real implementations using `portable-pty`,
 //! `setuid`/`fork`, and `CreateProcessAsUserW` live in the `esesätsch`
-//! binary crate (plan 3).
+//! binary crate.
 //!
 //! ## Interactive vs. non-interactive
 //!
@@ -196,8 +196,8 @@ mod mock {
         /// remains pending forever (test scenario for client disconnect).
         pub exit_status: Option<SessionExitStatus>,
         /// If `Some`, [`PtySpawner::spawn`] returns this error instead of a
-        /// child. Used to exercise spec §6.4 rule 6 (spawn-failure → exit 1
-        /// with no stderr to client).
+        /// child. Used to exercise the spawn-failure path (client sees
+        /// `exit-status = 1` with no diagnostic bytes).
         pub spawn_error: Option<String>,
     }
 

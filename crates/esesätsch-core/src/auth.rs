@@ -1,27 +1,28 @@
-//! Authentication trait surfaces (spec §6.3).
+//! Authentication trait surfaces.
 //!
 //! Three orthogonal authentication methods are supported, each enabled
 //! independently via the server config:
 //!
 //! - [`PasswordAuthenticator`] — verifies a `(username, password)` pair against
 //!   an OS-native backend (PAM on Unix, `LogonUserW` on Windows). The library
-//!   defines only the trait; the real backend lives in the `esesätsch` binary
+//!   defines only the trait; real backends live in the `esesätsch` binary
 //!   crate behind `#[cfg(target_os = ...)]`.
 //!
 //! - [`PubkeyAuthenticator`] — verifies an offered public-key blob against the
 //!   server's central TOML allowlist. Implemented in this crate by
 //!   [`AllowlistPubkeyAuthenticator`].
 //!
-//! - `CertAuthenticator` (later task) — verifies an OpenSSH certificate.
+//! - `CertAuthenticator` (see [`crate::cert`]) — verifies an OpenSSH certificate.
 //!
-//! ## Information-disclosure hygiene (spec §6.4)
+//! ## Information-disclosure hygiene
 //!
-//! Every implementation must perform the same amount of cryptographic work
-//! whether the user exists or not. Specifically:
+//! Every implementation performs the same amount of cryptographic work
+//! whether the user exists or not, so timing or branch-shape attacks can't
+//! distinguish unknown-user from bad-credential outcomes:
 //!
 //! - The pubkey allowlist impl performs a constant-time compare against a
-//!   fixed sentinel key when the user is missing, so the auth code path is
-//!   structurally identical between unknown-user and bad-credential cases.
+//!   fixed sentinel key when the user is missing, keeping the auth code
+//!   path structurally identical between the two failure cases.
 //! - A counter hook exposed via [`AllowlistPubkeyAuthenticator::sentinel_compares`]
 //!   lets tests assert that the sentinel-compare path actually ran in the
 //!   unknown-user case (testing the *structure* of the work, not its
@@ -60,9 +61,9 @@ pub trait PubkeyAuthenticator: Send + Sync {
 
 /// Central-allowlist pubkey authenticator backed by the server config.
 ///
-/// Spec §6.4 mandates that the compare must be constant-time and must run a
-/// sentinel comparison for unknown users so the code path's shape is the
-/// same regardless of whether the user exists.
+/// The compare is constant-time, and unknown-user lookups still run a
+/// sentinel comparison so the code path's shape is identical regardless
+/// of whether the user exists in the allowlist.
 #[derive(Debug)]
 pub struct AllowlistPubkeyAuthenticator {
     /// `username → [pre-parsed wire blob, …]`. Blobs are decoded once at

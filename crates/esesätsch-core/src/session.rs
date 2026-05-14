@@ -1,4 +1,4 @@
-//! SSH session loop (spec §8).
+//! SSH session loop.
 //!
 //! Once a client has authenticated and requested either `shell` or `exec`
 //! on a channel, [`run`] takes ownership of the spawned `PtyChild` and
@@ -12,7 +12,7 @@
 //! - **resize**: incoming `window-change` messages call
 //!   `PtyChild::resize`.
 //! - **exit**: when the child terminates, we send `exit-status` (or
-//!   `exit-status = 1` on internal failure — spec §6.4 rule 6) and close
+//!   `exit-status = 1` on internal failure, with no diagnostic bytes) and close
 //!   the channel.
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -89,7 +89,9 @@ pub async fn run(
                     std::future::pending().await
                 }
             } => {
-                // Spec §6.4 rule 6: internal error → opaque exit code 1.
+                // Internal error: surface to the client as an opaque exit
+                // code 1 (no diagnostic bytes — see the information-disclosure
+                // note at the crate root).
                 let code = res.map_or(1, |status| {
                     u32::try_from(status.code.unwrap_or(0)).unwrap_or(0)
                 });

@@ -1,7 +1,7 @@
 //! Compiled-in SSH algorithm allowlist.
 //!
 //! This module is the **single source of truth** for esesätsch's crypto
-//! policy (spec §7). There is no runtime configuration knob, no env var,
+//! policy. There is no runtime configuration knob, no env var,
 //! no TOML override. Changing the policy means editing this file, which
 //! flows through code review, lint, tests, and CI.
 //!

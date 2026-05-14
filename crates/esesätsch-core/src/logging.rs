@@ -5,7 +5,7 @@
 //! - a redaction helper applied to any text that contains sensitive fields
 //!   before it reaches the formatter.
 //!
-//! Sensitive fields (per spec §6.4): `password=…`, raw key blobs.
+//! Sensitive fields: `password=…`, raw key blobs.
 
 use std::io::{self, Write};
 
@@ -42,7 +42,7 @@ impl Verbosity {
 /// Wraps stderr with a [`RedactingWriter`] so any formatted log line
 /// containing a `password="…"` field is redacted **before** it reaches
 /// the operator's terminal — defence-in-depth on top of the per-call-site
-/// careful logging in the rest of the crate (spec §6.4 rule 9).
+/// careful logging in the rest of the crate.
 ///
 /// Idempotent for production binaries: the second call returns `Err` but
 /// callers may ignore it (binaries call this once at startup).
@@ -109,7 +109,7 @@ impl<W: Write> Write for RedactingWriter<W> {
 /// Redact sensitive substrings before logging.
 ///
 /// Currently handles the `password="…"` field pattern. Pubkey/cert blob
-/// redaction lives in the trace layer (plan 2) where the value is bytes,
+/// redaction lives in the trace layer where the value is bytes,
 /// not a quoted string.
 #[must_use]
 pub fn redact_sensitive(input: &str) -> String {
