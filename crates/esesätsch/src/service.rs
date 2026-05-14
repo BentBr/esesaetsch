@@ -110,7 +110,10 @@ fn install_impl(binary: &Path, config: Option<&Path>) -> Result<()> {
     }
 
     let mut dict = Dictionary::new();
-    dict.insert("Label".to_owned(), Value::String("com.esesaetsch.server".to_owned()));
+    dict.insert(
+        "Label".to_owned(),
+        Value::String("com.esesaetsch.server".to_owned()),
+    );
     dict.insert("ProgramArguments".to_owned(), Value::Array(program_args));
     dict.insert("RunAtLoad".to_owned(), Value::Boolean(true));
     dict.insert("KeepAlive".to_owned(), Value::Boolean(true));

@@ -158,7 +158,9 @@ async fn pump_to_handle_data<R: tokio::io::AsyncRead + Unpin>(
         match reader.read(&mut buf).await {
             Ok(0) | Err(_) => break,
             Ok(n) => {
-                let payload = russh::CryptoVec::from_slice(&buf[..n]);
+                // russh 0.60's `Handle::data` accepts `impl Into<bytes::Bytes>`.
+                // `Vec<u8>` implements that via the `From<Vec<u8>>` blanket.
+                let payload: Vec<u8> = buf[..n].to_vec();
                 if handle.data(channel_id, payload).await.is_err() {
                     break;
                 }
@@ -178,7 +180,7 @@ async fn pump_to_handle_ext_data<R: tokio::io::AsyncRead + Unpin>(
         match reader.read(&mut buf).await {
             Ok(0) | Err(_) => break,
             Ok(n) => {
-                let payload = russh::CryptoVec::from_slice(&buf[..n]);
+                let payload: Vec<u8> = buf[..n].to_vec();
                 if handle
                     .extended_data(channel_id, ext_type, payload)
                     .await

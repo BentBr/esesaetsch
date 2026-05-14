@@ -1,11 +1,11 @@
 //! Host-key load/generate operations (used by the `gen-key` subcommand and
 //! by the server's startup path).
-//!
-//! v1 generates Ed25519 keys. The `russh-keys` crate provides parsing of
-//! the OpenSSH on-disk format.
 
 use std::fs;
 use std::path::Path;
+
+use ssh_key::rand_core::OsRng;
+use ssh_key::{Algorithm, LineEnding, PrivateKey as SshKeyPrivateKey};
 
 use crate::error::HostKeyError;
 
@@ -15,19 +15,24 @@ use crate::error::HostKeyError;
 ///
 /// - `HostKeyError::Io` if the file cannot be read.
 /// - `HostKeyError::Malformed` if the contents are not a valid OpenSSH key.
-pub fn load(path: &Path) -> Result<russh_keys::key::KeyPair, HostKeyError> {
+pub fn load(path: &Path) -> Result<russh::keys::PrivateKey, HostKeyError> {
     let pem = fs::read_to_string(path).map_err(|source| HostKeyError::Io {
         path: path.display().to_string(),
         source,
     })?;
-    russh_keys::decode_secret_key(&pem, None).map_err(|e| HostKeyError::Malformed {
+    russh::keys::decode_secret_key(&pem, None).map_err(|e| HostKeyError::Malformed {
         path: path.display().to_string(),
         detail: format!("{e}"),
     })
 }
 
 /// Generate a fresh Ed25519 host key and write it to `path` in OpenSSH
-/// PEM format with 0600 permissions on Unix.
+/// format with 0600 permissions on Unix.
+///
+/// Internally we generate via the standalone `ssh-key` 0.6 crate (which
+/// has an ergonomic `PrivateKey::random`) and write the OpenSSH PEM. The
+/// `load` path then parses it back as `russh::keys::PrivateKey` —
+/// OpenSSH PEM is wire-stable, so this round-trip is exact.
 ///
 /// # Errors
 ///
@@ -36,14 +41,13 @@ pub fn load(path: &Path) -> Result<russh_keys::key::KeyPair, HostKeyError> {
 /// - `HostKeyError::Io` if the write fails or the parent directory does
 ///   not exist.
 pub fn generate(path: &Path) -> Result<(), HostKeyError> {
-    let key = russh_keys::key::KeyPair::generate_ed25519()
-        .ok_or_else(|| HostKeyError::Generation("ed25519 generation returned None".to_owned()))?;
-
-    let mut pem: Vec<u8> = Vec::new();
-    russh_keys::encode_pkcs8_pem(&key, &mut pem)
+    let key = SshKeyPrivateKey::random(&mut OsRng, Algorithm::Ed25519)
+        .map_err(|e| HostKeyError::Generation(format!("{e}")))?;
+    let pem = key
+        .to_openssh(LineEnding::LF)
         .map_err(|e| HostKeyError::Generation(format!("encode failed: {e}")))?;
 
-    fs::write(path, &pem).map_err(|source| HostKeyError::Io {
+    fs::write(path, pem.as_bytes()).map_err(|source| HostKeyError::Io {
         path: path.display().to_string(),
         source,
     })?;
@@ -66,7 +70,7 @@ pub fn generate(path: &Path) -> Result<(), HostKeyError> {
 /// # Errors
 ///
 /// See `load` and `generate`.
-pub fn load_or_generate(path: &Path) -> Result<russh_keys::key::KeyPair, HostKeyError> {
+pub fn load_or_generate(path: &Path) -> Result<russh::keys::PrivateKey, HostKeyError> {
     if !path.exists() {
         generate(path)?;
     }

@@ -10,7 +10,6 @@ use esesaetsch_core::auth::{
     AllowlistPubkeyAuthenticator, PasswordAuthenticator, PubkeyAuthenticator,
 };
 use esesaetsch_core::error::AuthError;
-use russh_keys::PublicKeyBase64;
 
 use common::{ED25519_FIXTURE, MockPasswordAuthenticator, pubkey_blob};
 
@@ -71,13 +70,18 @@ fn pubkey_allowlist_rejects_malformed_entry_at_construction() {
 fn pubkey_allowlist_supports_multiple_keys_per_user() {
     // Generate a second valid key so we can list two keys for one user and
     // verify either matches.
-    let key2 = russh_keys::key::KeyPair::generate_ed25519().unwrap();
-    let key2_pub = key2.clone_public_key().unwrap();
-    let key2_line = format!(
-        "{} {} test-key-2",
-        key2_pub.name(),
-        key2_pub.public_key_base64()
-    );
+    use ssh_key::rand_core::OsRng;
+    use ssh_key::{Algorithm, LineEnding, PrivateKey};
+    let key2 = PrivateKey::random(&mut OsRng, Algorithm::Ed25519).unwrap();
+    let key2_pub = key2.public_key();
+    let key2_pem = key2_pub.to_openssh().unwrap();
+    let key2_b64 = key2_pem
+        .split_whitespace()
+        .nth(1)
+        .expect("openssh line has b64 token")
+        .to_owned();
+    let key2_line = format!("{} {} test-key-2", key2_pub.algorithm().as_str(), key2_b64);
+    let _ = LineEnding::LF; // imported for future use
 
     let mut map = BTreeMap::new();
     map.insert(

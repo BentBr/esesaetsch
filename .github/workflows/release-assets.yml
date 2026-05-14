@@ -1,10 +1,14 @@
 name: release-assets
 
-# Triggered when release-please creates a GitHub Release after the
-# release PR is merged. Builds cross-target binaries and uploads them
-# as release assets. The user-facing executable filename is
-# `esesätsch` (the Cargo package name `esesaetsch` is renamed during
-# the package step).
+# Triggered when release-please publishes a GitHub Release (after the
+# auto-generated release PR is merged into main). The flow is:
+#
+#   1. fmt + clippy + tests on each runnable platform
+#      (Linux x86_64, macOS aarch64, Windows x86_64)
+#   2. only if every check passes, cross-build all 5 release targets
+#      and upload them as assets on the just-published release.
+#
+# This guarantees that no broken artefact is ever attached to a release.
 
 on:
   release:
@@ -13,13 +17,63 @@ on:
 permissions:
   contents: write
 
-# Security: github.event.release.tag_name is the only event-derived value
-# used. It is bound to an env var and passed as a positional argument to
-# `gh release upload`, never interpolated into a shell command string.
+# Notes on security: the only event-derived value we use in run steps is
+# `github.event.release.tag_name`. It is bound to an env var and passed
+# as a positional argument to `gh release upload`, never interpolated
+# into a shell command string.
 
 jobs:
+
+  # ---------- gate: format + lint + tests ----------
+
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo +nightly clippy --workspace --all-targets -- -D clippy::all -D warnings -D clippy::pedantic -D clippy::nursery
+
+  test-linux-x64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace
+
+  test-macos-arm:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace
+
+  test-windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace
+
+  # ---------- build + upload (only after gate is green) ----------
+
   build-and-upload:
     name: ${{ matrix.target }}
+    needs: [fmt, clippy, test-linux-x64, test-macos-arm, test-windows-x64]
     runs-on: ${{ matrix.runs-on }}
     strategy:
       fail-fast: false

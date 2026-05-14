@@ -32,7 +32,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use russh_keys::PublicKeyBase64;
+use russh::keys::PublicKeyBase64;
 use subtle::ConstantTimeEq;
 
 use crate::error::AuthError;
@@ -65,7 +65,7 @@ pub trait PasswordAuthenticator: Send + Sync {
 /// Authenticate a `(username, public-key-blob)` pair.
 pub trait PubkeyAuthenticator: Send + Sync {
     /// Verify the offered key. `key_blob` is the SSH wire-format public-key
-    /// blob (the bytes that `russh_keys::PublicKey::public_key_bytes` returns).
+    /// blob (the bytes that `russh::keys::PublicKey::public_key_bytes` returns).
     ///
     /// # Errors
     ///
@@ -109,7 +109,7 @@ impl AllowlistPubkeyAuthenticator {
                 let b64 = line.split_whitespace().nth(1).ok_or_else(|| {
                     AuthError::Backend(format!("allowlist entry for {user} missing base64 blob"))
                 })?;
-                let parsed = russh_keys::parse_public_key_base64(b64)
+                let parsed = russh::keys::parse_public_key_base64(b64)
                     .map_err(|e| AuthError::Backend(format!("decoding key for {user}: {e}")))?;
                 decoded.push(parsed.public_key_bytes());
             }

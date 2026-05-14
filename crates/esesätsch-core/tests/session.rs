@@ -26,12 +26,13 @@ use tokio::time::timeout;
 use common::{AcceptAnyClientHandler, MockPasswordAuthenticator, TestServer, client_config};
 
 #[allow(clippy::expect_used)] // test helper
-fn to_russh_keypair(p: &PrivateKey) -> russh_keys::key::KeyPair {
+fn to_russh_pk(p: &PrivateKey) -> russh::keys::PrivateKeyWithHashAlg {
     let openssh = p
         .to_openssh(ssh_key::LineEnding::LF)
         .expect("to_openssh")
         .to_string();
-    russh_keys::decode_secret_key(&openssh, None).expect("decode_secret_key")
+    let key = russh::keys::decode_secret_key(&openssh, None).expect("decode_secret_key");
+    russh::keys::PrivateKeyWithHashAlg::new(Arc::new(key), None)
 }
 
 #[allow(clippy::unwrap_used)] // test helper
@@ -70,12 +71,12 @@ async fn connect_and_auth(
     .expect("connect timed out")
     .expect("connect");
 
-    let kp = Arc::new(to_russh_keypair(user_key));
+    let kp = to_russh_pk(user_key);
     let ok = handle
         .authenticate_publickey("alice", kp)
         .await
         .expect("auth");
-    assert!(ok, "auth should succeed");
+    assert!(ok.success(), "auth should succeed");
     handle
 }
 

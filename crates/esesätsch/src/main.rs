@@ -138,6 +138,22 @@ async fn cmd_serve(args: &Args) -> Result<()> {
             .context("building pubkey allowlist")?,
     );
 
+    // Operator-friendly warning: pubkey is the only auth method AND the
+    // allowlist is empty — no client will ever authenticate.
+    if cfg.pubkey_enabled
+        && !cfg.password_enabled
+        && !cfg.cert_enabled
+        && cfg.authorized_keys.is_empty()
+    {
+        eprintln!(
+            "esesätsch: WARNING — pubkey auth is the only method enabled and the \
+             authorized_keys allowlist is empty. No client will be able to \
+             authenticate. Provide a config file via --config containing your \
+             public keys, e.g.:\n\
+             \n    [auth.authorized_keys]\n    yourname = [\"ssh-ed25519 AAAA… you@host\"]\n",
+        );
+    }
+
     // Password authenticator: PAM on Unix (when built with `--features pam-auth`),
     // LogonUserW on Windows (later). When password auth is disabled in
     // config we use a deny-all stub — the server short-circuits before

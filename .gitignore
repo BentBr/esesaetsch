@@ -15,5 +15,6 @@ target
 .DS_Store
 .vscode/
 
-# local host key if created during build
+# local host key if created during build + config
 host_key
+config.toml

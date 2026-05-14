@@ -8,14 +8,13 @@
 //! channel that bridges the spawned `PtyChild` to the russh wire protocol.
 
 use std::collections::HashMap;
+use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use async_trait::async_trait;
+use russh::keys::{PublicKey, PublicKeyBase64};
 use russh::server::{Auth, Config as RusshConfig, Handler, Msg, Server, Session};
-use russh::{Channel, ChannelId, SshId};
-use russh_keys::PublicKeyBase64;
-use russh_keys::key::PublicKey;
+use russh::{Channel, ChannelId, MethodKind, MethodSet, SshId};
 use tokio::sync::mpsc;
 
 use crate::auth::{PasswordAuthenticator, PubkeyAuthenticator};
@@ -34,9 +33,6 @@ struct ServerState {
     config: Config,
     pubkey_auth: Arc<dyn PubkeyAuthenticator>,
     password_auth: Arc<dyn PasswordAuthenticator>,
-    /// Optional: only used when `config.cert_enabled` is true.
-    /// Held now so cert-via-russh wiring is a localised change later.
-    #[allow(dead_code)]
     cert_auth: Option<Arc<dyn CertAuthenticator>>,
     spawner: Arc<dyn PtySpawner>,
 }
@@ -55,14 +51,14 @@ impl EsesätschServer {
         password_auth: Arc<dyn PasswordAuthenticator>,
         cert_auth: Option<Arc<dyn CertAuthenticator>>,
         spawner: Arc<dyn PtySpawner>,
-        host_key: russh_keys::key::KeyPair,
+        host_key: russh::keys::PrivateKey,
     ) -> (Self, Arc<RusshConfig>) {
         let methods = advertised_methods(&config);
 
         let russh_config = RusshConfig {
             // Server identification string reveals no minor/patch, no OS,
             // no hostname — defence against fingerprinting.
-            server_id: SshId::Standard("SSH-2.0-esesaetsch_0".to_owned()),
+            server_id: SshId::Standard("SSH-2.0-esesaetsch_0".into()),
             methods,
             keys: vec![host_key],
             preferred: crypto::preferences(),
@@ -83,15 +79,15 @@ impl EsesätschServer {
     }
 }
 
-fn advertised_methods(config: &Config) -> russh::MethodSet {
-    let mut m = russh::MethodSet::empty();
+fn advertised_methods(config: &Config) -> MethodSet {
+    let mut methods = Vec::new();
     if config.pubkey_enabled || config.cert_enabled {
-        m |= russh::MethodSet::PUBLICKEY;
+        methods.push(MethodKind::PublicKey);
     }
     if config.password_enabled {
-        m |= russh::MethodSet::PASSWORD;
+        methods.push(MethodKind::Password);
     }
-    m
+    MethodSet::from(methods.as_slice())
 }
 
 impl Server for EsesätschServer {
@@ -114,11 +110,7 @@ impl Server for EsesätschServer {
 
 /// Per-channel state tracked by the connection handler.
 struct ChannelEntry {
-    /// PTY allocation recorded on `pty_request`, consumed by
-    /// `shell_request`/`exec_request`.
     pty_request: Option<PtyRequestInfo>,
-    /// Sender into the running session task. `None` until shell/exec has
-    /// been requested.
     control_tx: Option<mpsc::Sender<ControlMsg>>,
 }
 
@@ -133,7 +125,6 @@ pub struct ConnectionHandler {
     state: Arc<ServerState>,
     peer: Option<SocketAddr>,
     authenticated_user: Option<String>,
-    /// Cert grants captured during a successful cert auth (force-command).
     cert_grants: Option<CertGrants>,
     channels: HashMap<ChannelId, ChannelEntry>,
 }
@@ -146,6 +137,7 @@ impl ConnectionHandler {
     fn uniform_reject(&self) -> Auth {
         Auth::Reject {
             proceed_with_methods: Some(advertised_methods(&self.state.config)),
+            partial_success: false,
         }
     }
 
@@ -154,6 +146,76 @@ impl ConnectionHandler {
             pty_request: None,
             control_tx: None,
         })
+    }
+
+    /// Run cert validation synchronously, mutating `self` on success so
+    /// the authenticated user and grants are visible to subsequent
+    /// handler calls.
+    fn run_cert_auth(&mut self, user: &str, certificate: &russh::keys::Certificate) -> Auth {
+        if !self.state.config.cert_enabled {
+            tracing::warn!(
+                target: "esesaetsch_core::server",
+                user,
+                method = "openssh-cert",
+                reason = "method_disabled",
+                "auth rejected",
+            );
+            return self.uniform_reject();
+        }
+        let Some(cert_auth) = self.state.cert_auth.clone() else {
+            tracing::warn!(
+                target: "esesaetsch_core::server",
+                user,
+                reason = "no_cert_authenticator_configured",
+                "auth rejected",
+            );
+            return self.uniform_reject();
+        };
+        let Ok(bytes) = certificate.to_bytes() else {
+            tracing::warn!(
+                target: "esesaetsch_core::server",
+                user,
+                reason = "cert_serialisation_failed",
+                "auth rejected",
+            );
+            return self.uniform_reject();
+        };
+        let parsed = match crate::cert::ParsedCert::parse(&bytes) {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::warn!(
+                    target: "esesaetsch_core::server",
+                    user,
+                    error = %e,
+                    "cert parse failed",
+                );
+                return self.uniform_reject();
+            }
+        };
+        match cert_auth.verify(user, &parsed) {
+            Ok(grants) => {
+                self.authenticated_user = Some(user.to_owned());
+                self.cert_grants = Some(grants.clone());
+                tracing::info!(
+                    target: "esesaetsch_core::server",
+                    user,
+                    method = "openssh-cert",
+                    force_command = grants.force_command.is_some(),
+                    "auth succeeded",
+                );
+                Auth::Accept
+            }
+            Err(e) => {
+                tracing::warn!(
+                    target: "esesaetsch_core::server",
+                    user,
+                    method = "openssh-cert",
+                    reason = %e,
+                    "auth rejected",
+                );
+                self.uniform_reject()
+            }
+        }
     }
 
     /// Build a `SpawnSpec`, call the spawner, and launch a session task.
@@ -172,8 +234,8 @@ impl ConnectionHandler {
                 target: "esesaetsch_core::server",
                 "shell/exec request without prior auth — refusing",
             );
-            session.exit_status_request(channel_id, 1);
-            session.close(channel_id);
+            let _ = session.exit_status_request(channel_id, 1);
+            let _ = session.close(channel_id);
             return;
         };
 
@@ -206,8 +268,8 @@ impl ConnectionHandler {
                     error = %e,
                     "spawn failed; client sees exit-status=1 with no detail",
                 );
-                session.exit_status_request(channel_id, 1);
-                session.close(channel_id);
+                let _ = session.exit_status_request(channel_id, 1);
+                let _ = session.close(channel_id);
                 return;
             }
         };
@@ -227,21 +289,56 @@ impl ConnectionHandler {
 }
 
 // =====================================================================
-// russh::server::Handler implementation
+// russh::server::Handler implementation (russh 0.60 — native impl Future)
 // =====================================================================
 
-#[async_trait]
+// `clippy::manual_async_fn` triggers on every method below because russh
+// 0.60 declares Handler methods as `fn ... -> impl Future + Send` rather
+// than `async fn`. The trait shape is fixed by upstream; we match it.
+#[allow(clippy::manual_async_fn)]
 impl Handler for ConnectionHandler {
     type Error = russh::Error;
 
     // -------- Auth --------
 
-    async fn auth_none(&mut self, _user: &str) -> Result<Auth, Self::Error> {
-        Ok(self.uniform_reject())
+    fn auth_none(&mut self, _user: &str) -> impl Future<Output = Result<Auth, Self::Error>> + Send {
+        let reject = self.uniform_reject();
+        async move { Ok(reject) }
     }
 
-    async fn auth_password(&mut self, user: &str, password: &str) -> Result<Auth, Self::Error> {
-        if !self.state.config.password_enabled {
+    fn auth_password(
+        &mut self,
+        user: &str,
+        password: &str,
+    ) -> impl Future<Output = Result<Auth, Self::Error>> + Send {
+        // Auth has no awaits — compute the verdict synchronously so we
+        // can mutate `self.authenticated_user` on success; the returned
+        // future is trivial.
+        let result = if self.state.config.password_enabled {
+            match self.state.password_auth.verify(user, password) {
+                Ok(()) => {
+                    self.authenticated_user = Some(user.to_owned());
+                    tracing::info!(
+                        target: "esesaetsch_core::server",
+                        user,
+                        method = "password",
+                        peer = ?self.peer,
+                        "auth succeeded",
+                    );
+                    Auth::Accept
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        target: "esesaetsch_core::server",
+                        user,
+                        method = "password",
+                        reason = %e,
+                        "auth rejected",
+                    );
+                    self.uniform_reject()
+                }
+            }
+        } else {
             tracing::warn!(
                 target: "esesaetsch_core::server",
                 user,
@@ -249,63 +346,45 @@ impl Handler for ConnectionHandler {
                 reason = "method_disabled",
                 "auth rejected",
             );
-            return Ok(self.uniform_reject());
-        }
-        match self.state.password_auth.verify(user, password) {
-            Ok(()) => {
-                self.authenticated_user = Some(user.to_owned());
-                tracing::info!(
-                    target: "esesaetsch_core::server",
-                    user,
-                    method = "password",
-                    peer = ?self.peer,
-                    "auth succeeded",
-                );
-                Ok(Auth::Accept)
-            }
-            Err(e) => {
-                tracing::warn!(
-                    target: "esesaetsch_core::server",
-                    user,
-                    method = "password",
-                    reason = %e,
-                    "auth rejected",
-                );
-                Ok(self.uniform_reject())
-            }
-        }
+            self.uniform_reject()
+        };
+        async move { Ok(result) }
     }
 
-    async fn auth_publickey(
+    fn auth_publickey(
         &mut self,
         user: &str,
         public_key: &PublicKey,
-    ) -> Result<Auth, Self::Error> {
-        let key_type = public_key.name();
-        let is_cert = key_type.contains("-cert-v01@openssh.com");
-
-        if is_cert {
-            // Cert auth via russh's wire protocol is deferred: russh-keys
-            // 0.45's `PublicKey` enum has only Ed25519 / RSA / EC variants
-            // (no `Certificate` variant), and `PublicKey::parse` does not
-            // recognise the `*-cert-v01@openssh.com` algorithm tags. The
-            // cert blob never reaches our handler.
-            //
-            // The `CaTrustCertAuthenticator` is fully validated in
-            // isolation (14 tests in `tests/cert.rs`). When russh exposes
-            // a cert-aware hook (or we wrap russh ourselves), the cert
-            // path is a small change here.
-            tracing::warn!(
-                target: "esesaetsch_core::server",
-                user,
-                key_type,
-                reason = "cert_auth_via_russh_not_supported_in_0_45",
-                "auth rejected",
-            );
-            return Ok(self.uniform_reject());
-        }
-
-        if !self.state.config.pubkey_enabled {
+    ) -> impl Future<Output = Result<Auth, Self::Error>> + Send {
+        let alg = public_key.algorithm().as_str().to_owned();
+        let blob = public_key.public_key_bytes();
+        let result = if self.state.config.pubkey_enabled {
+            match self.state.pubkey_auth.verify(user, &blob) {
+                Ok(()) => {
+                    self.authenticated_user = Some(user.to_owned());
+                    tracing::info!(
+                        target: "esesaetsch_core::server",
+                        user,
+                        method = "publickey",
+                        key_type = %alg,
+                        peer = ?self.peer,
+                        "auth succeeded",
+                    );
+                    Auth::Accept
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        target: "esesaetsch_core::server",
+                        user,
+                        method = "publickey",
+                        key_type = %alg,
+                        reason = %e,
+                        "auth rejected",
+                    );
+                    self.uniform_reject()
+                }
+            }
+        } else {
             tracing::warn!(
                 target: "esesaetsch_core::server",
                 user,
@@ -313,49 +392,32 @@ impl Handler for ConnectionHandler {
                 reason = "method_disabled",
                 "auth rejected",
             );
-            return Ok(self.uniform_reject());
-        }
+            self.uniform_reject()
+        };
+        async move { Ok(result) }
+    }
 
-        let blob = public_key.public_key_bytes();
-        match self.state.pubkey_auth.verify(user, &blob) {
-            Ok(()) => {
-                self.authenticated_user = Some(user.to_owned());
-                tracing::info!(
-                    target: "esesaetsch_core::server",
-                    user,
-                    method = "publickey",
-                    key_type,
-                    peer = ?self.peer,
-                    "auth succeeded",
-                );
-                Ok(Auth::Accept)
-            }
-            Err(e) => {
-                tracing::warn!(
-                    target: "esesaetsch_core::server",
-                    user,
-                    method = "publickey",
-                    key_type,
-                    reason = %e,
-                    "auth rejected",
-                );
-                Ok(self.uniform_reject())
-            }
-        }
+    fn auth_openssh_certificate(
+        &mut self,
+        user: &str,
+        certificate: &russh::keys::Certificate,
+    ) -> impl Future<Output = Result<Auth, Self::Error>> + Send {
+        let result = self.run_cert_auth(user, certificate);
+        async move { Ok(result) }
     }
 
     // -------- Channels --------
 
-    async fn channel_open_session(
+    fn channel_open_session(
         &mut self,
         channel: Channel<Msg>,
         _session: &mut Session,
-    ) -> Result<bool, Self::Error> {
+    ) -> impl Future<Output = Result<bool, Self::Error>> + Send {
         self.channel_entry_mut(channel.id());
-        Ok(true)
+        async { Ok(true) }
     }
 
-    async fn pty_request(
+    fn pty_request(
         &mut self,
         channel: ChannelId,
         term: &str,
@@ -365,7 +427,7 @@ impl Handler for ConnectionHandler {
         pix_height: u32,
         _modes: &[(russh::Pty, u32)],
         _session: &mut Session,
-    ) -> Result<(), Self::Error> {
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
         let info = PtyRequestInfo {
             term: term.to_owned(),
             size: TerminalSize {
@@ -376,53 +438,57 @@ impl Handler for ConnectionHandler {
             },
         };
         self.channel_entry_mut(channel).pty_request = Some(info);
-        Ok(())
+        async { Ok(()) }
     }
 
-    async fn shell_request(
+    fn shell_request(
         &mut self,
         channel: ChannelId,
         session: &mut Session,
-    ) -> Result<(), Self::Error> {
-        // Interactive iff a pty_request preceded.
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
         let interactive = self
             .channels
             .get(&channel)
             .is_some_and(|c| c.pty_request.is_some());
         self.launch_session(channel, Command::Shell, interactive, session);
-        Ok(())
+        async { Ok(()) }
     }
 
-    async fn exec_request(
+    fn exec_request(
         &mut self,
         channel: ChannelId,
         data: &[u8],
         session: &mut Session,
-    ) -> Result<(), Self::Error> {
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
         let cmd = String::from_utf8_lossy(data).into_owned();
         let interactive = self
             .channels
             .get(&channel)
             .is_some_and(|c| c.pty_request.is_some());
         self.launch_session(channel, Command::Exec(cmd), interactive, session);
-        Ok(())
+        async { Ok(()) }
     }
 
-    async fn data(
+    fn data(
         &mut self,
         channel: ChannelId,
         data: &[u8],
         _session: &mut Session,
-    ) -> Result<(), Self::Error> {
-        if let Some(entry) = self.channels.get(&channel) {
-            if let Some(tx) = &entry.control_tx {
-                let _ = tx.send(ControlMsg::Stdin(data.to_vec())).await;
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
+        let tx = self
+            .channels
+            .get(&channel)
+            .and_then(|c| c.control_tx.clone());
+        let bytes = data.to_vec();
+        async move {
+            if let Some(tx) = tx {
+                let _ = tx.send(ControlMsg::Stdin(bytes)).await;
             }
+            Ok(())
         }
-        Ok(())
     }
 
-    async fn window_change_request(
+    fn window_change_request(
         &mut self,
         channel: ChannelId,
         col_width: u32,
@@ -430,18 +496,19 @@ impl Handler for ConnectionHandler {
         _pix_width: u32,
         _pix_height: u32,
         _session: &mut Session,
-    ) -> Result<(), Self::Error> {
-        if let Some(entry) = self.channels.get(&channel) {
-            if let Some(tx) = &entry.control_tx {
-                let _ = tx
-                    .send(ControlMsg::Resize {
-                        cols: u16::try_from(col_width).unwrap_or(80),
-                        rows: u16::try_from(row_height).unwrap_or(24),
-                    })
-                    .await;
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
+        let tx = self
+            .channels
+            .get(&channel)
+            .and_then(|c| c.control_tx.clone());
+        let cols = u16::try_from(col_width).unwrap_or(80);
+        let rows = u16::try_from(row_height).unwrap_or(24);
+        async move {
+            if let Some(tx) = tx {
+                let _ = tx.send(ControlMsg::Resize { cols, rows }).await;
             }
+            Ok(())
         }
-        Ok(())
     }
 }
 
@@ -459,24 +526,32 @@ mod tests {
         cfg.pubkey_enabled = true;
         cfg.password_enabled = false;
         cfg.cert_enabled = false;
-        assert_eq!(advertised_methods(&cfg), russh::MethodSet::PUBLICKEY);
+        assert_eq!(
+            advertised_methods(&cfg),
+            MethodSet::from(&[MethodKind::PublicKey][..])
+        );
 
         cfg.pubkey_enabled = false;
         cfg.password_enabled = true;
-        assert_eq!(advertised_methods(&cfg), russh::MethodSet::PASSWORD);
+        assert_eq!(
+            advertised_methods(&cfg),
+            MethodSet::from(&[MethodKind::Password][..])
+        );
 
         cfg.pubkey_enabled = false;
         cfg.password_enabled = false;
         cfg.cert_enabled = true;
-        // cert_enabled also advertises PUBLICKEY (cert auth rides on it).
-        assert_eq!(advertised_methods(&cfg), russh::MethodSet::PUBLICKEY);
+        assert_eq!(
+            advertised_methods(&cfg),
+            MethodSet::from(&[MethodKind::PublicKey][..])
+        );
 
         cfg.pubkey_enabled = true;
         cfg.password_enabled = true;
         cfg.cert_enabled = true;
         assert_eq!(
             advertised_methods(&cfg),
-            russh::MethodSet::PUBLICKEY | russh::MethodSet::PASSWORD,
+            MethodSet::from(&[MethodKind::PublicKey, MethodKind::Password][..]),
         );
     }
 }

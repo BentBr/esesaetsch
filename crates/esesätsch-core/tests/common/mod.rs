@@ -151,12 +151,12 @@ pub const ED25519_FIXTURE: &str =
 /// wire-blob bytes used by `PubkeyAuthenticator`. Convenience for tests.
 #[must_use]
 pub fn pubkey_blob(openssh_line: &str) -> Vec<u8> {
-    use russh_keys::PublicKeyBase64;
+    use russh::keys::PublicKeyBase64;
     let b64 = openssh_line
         .split_whitespace()
         .nth(1)
         .expect("openssh line has b64 token");
-    russh_keys::parse_public_key_base64(b64)
+    russh::keys::parse_public_key_base64(b64)
         .expect("test fixture parses")
         .public_key_bytes()
 }
@@ -278,7 +278,7 @@ impl TestServer {
         let listener = TcpListener::bind(("127.0.0.1", 0)).await.expect("bind");
         let bound_addr = listener.local_addr().expect("local_addr");
 
-        let host_key = russh_keys::key::KeyPair::generate_ed25519().expect("gen ed25519 host key");
+        let host_key = generate_host_key_for_tests();
         let (mut server, russh_config) =
             EsesätschServer::new(config, pubkey_auth, password_auth, None, spawner, host_key);
 
@@ -327,6 +327,20 @@ impl TestServer {
     }
 }
 
+/// Generate a fresh Ed25519 host key via ssh-key 0.6 (friendlier API) and
+/// re-parse it via russh's vendored ssh-key fork. OpenSSH PEM is
+/// wire-stable across both, so the round-trip is exact.
+fn generate_host_key_for_tests() -> russh::keys::PrivateKey {
+    use ssh_key::rand_core::OsRng as SshOsRng;
+    use ssh_key::{Algorithm, LineEnding, PrivateKey as SshKeyPrivateKey};
+    let host_key_ssh =
+        SshKeyPrivateKey::random(&mut SshOsRng, Algorithm::Ed25519).expect("gen ed25519 host key");
+    let host_key_pem = host_key_ssh
+        .to_openssh(LineEnding::LF)
+        .expect("host key to_openssh");
+    russh::keys::decode_secret_key(&host_key_pem, None).expect("decode_secret_key")
+}
+
 impl Drop for TestServer {
     fn drop(&mut self) {
         if let Some(h) = self.handle.take() {
@@ -338,15 +352,15 @@ impl Drop for TestServer {
 /// Permissive client-side handler that accepts any server host key.
 pub struct AcceptAnyClientHandler;
 
-#[async_trait::async_trait]
+#[allow(clippy::manual_async_fn)] // matches russh's `fn -> impl Future` trait shape
 impl russh::client::Handler for AcceptAnyClientHandler {
     type Error = russh::Error;
 
-    async fn check_server_key(
+    fn check_server_key(
         &mut self,
-        _server_public_key: &russh_keys::key::PublicKey,
-    ) -> Result<bool, Self::Error> {
-        Ok(true)
+        _server_public_key: &russh::keys::PublicKey,
+    ) -> impl std::future::Future<Output = Result<bool, Self::Error>> + Send {
+        async { Ok(true) }
     }
 }
 

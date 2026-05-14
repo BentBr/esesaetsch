@@ -63,6 +63,19 @@ async fn try_handshake(server: &TestServer, client_cfg: Arc<ClientConfig>) -> Re
 // =====================================================================
 
 #[tokio::test]
+async fn kex_mlkem768x25519_sha256_negotiates() {
+    // Post-quantum hybrid KEX — must negotiate against modern OpenSSH
+    // clients (9.9+) and the russh client.
+    let (server, _user_key) = TestServer::with_default_users().await;
+    try_handshake(
+        &server,
+        client_with_only_kex(russh::kex::MLKEM768X25519_SHA256),
+    )
+    .await
+    .expect("mlkem768x25519-sha256 must negotiate");
+}
+
+#[tokio::test]
 async fn kex_curve25519_sha256_negotiates() {
     let (server, _user_key) = TestServer::with_default_users().await;
     try_handshake(&server, client_with_only_kex(russh::kex::CURVE25519))
@@ -140,19 +153,9 @@ async fn legacy_cipher_aes256_cbc_is_rejected() {
     );
 }
 
-#[tokio::test]
-async fn legacy_cipher_3des_cbc_is_rejected() {
-    let (server, _user_key) = TestServer::with_default_users().await;
-    let outcome = try_handshake(
-        &server,
-        client_with_only_cipher(russh::cipher::TRIPLE_DES_CBC),
-    )
-    .await;
-    assert!(
-        outcome.is_err(),
-        "client offering only 3des-cbc must fail to negotiate, got {outcome:?}",
-    );
-}
+// `3des-cbc` is gated behind russh's `des` feature (opt-in legacy support)
+// and isn't reachable in default builds; the AES-CBC tests above cover the
+// "client only offers legacy cipher" rejection contract.
 
 // Legacy-MAC tests are intentionally omitted: our cipher allowlist is
 // AEAD-only (chacha20-poly1305 and aes256-gcm). SSH treats the MAC

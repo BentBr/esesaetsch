@@ -151,7 +151,7 @@ impl CaTrustCertAuthenticator {
     ///
     /// `AuthError::Backend` if any CA entry fails to parse.
     pub fn new(trusted_cas: &[String], revoked_serials: &[u64]) -> Result<Self, AuthError> {
-        use russh_keys::PublicKeyBase64;
+        use russh::keys::PublicKeyBase64;
         let mut blobs = Vec::with_capacity(trusted_cas.len());
         for line in trusted_cas {
             let b64 = line.split_whitespace().nth(1).ok_or_else(|| {
@@ -160,7 +160,7 @@ impl CaTrustCertAuthenticator {
                     line.chars().take(40).collect::<String>(),
                 ))
             })?;
-            let parsed = russh_keys::parse_public_key_base64(b64)
+            let parsed = russh::keys::parse_public_key_base64(b64)
                 .map_err(|e| AuthError::Backend(format!("decoding CA: {e}")))?;
             blobs.push(parsed.public_key_bytes());
         }

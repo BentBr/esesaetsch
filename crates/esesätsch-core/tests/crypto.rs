@@ -6,12 +6,15 @@ use esesaetsch_core::crypto::{CIPHERS, COMPRESSION, HOST_KEY_ALGORITHMS, KEX_ALG
 
 #[test]
 fn kex_algorithms_match_spec() {
-    // sntrup761x25519-sha512@openssh.com (post-quantum hybrid) is a
-    // desired entry but absent from russh 0.45; tracked via TODO in
-    // crypto.rs.
+    // mlkem768x25519-sha256 is the IETF-standardised ML-KEM/X25519 hybrid
+    // (post-quantum) preferred by OpenSSH 9.9+ and what russh 0.60 negotiates.
     assert_eq!(
         KEX_ALGORITHMS,
-        &["curve25519-sha256", "curve25519-sha256@libssh.org"]
+        &[
+            "mlkem768x25519-sha256",
+            "curve25519-sha256",
+            "curve25519-sha256@libssh.org",
+        ]
     );
 }
 

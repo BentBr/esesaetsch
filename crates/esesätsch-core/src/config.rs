@@ -223,7 +223,7 @@ fn parse_pubkey_blob(line: &str) -> Result<(), String> {
         .split_whitespace()
         .nth(1)
         .ok_or_else(|| "missing base64 blob (expected `type base64 [comment]`)".to_owned())?;
-    russh_keys::parse_public_key_base64(blob).map_err(|e| format!("{e}"))?;
+    russh::keys::parse_public_key_base64(blob).map_err(|e| format!("{e}"))?;
     Ok(())
 }
 

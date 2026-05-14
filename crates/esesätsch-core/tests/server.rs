@@ -15,16 +15,17 @@ use tokio::time::timeout;
 
 use common::{AcceptAnyClientHandler, TestServer, client_config};
 
-/// Re-export the test user's key as a russh `KeyPair` so the client can
-/// sign with it. We round-trip through OpenSSH text format since
-/// `ssh-key` and `russh-keys` share that format.
+/// Convert the test user's `ssh-key` `PrivateKey` to russh's
+/// `PrivateKeyWithHashAlg` (the type `authenticate_publickey` consumes).
+/// OpenSSH PEM is wire-stable across both ssh-key forks.
 #[allow(clippy::expect_used)] // test helper
-fn to_russh_keypair(p: &PrivateKey) -> russh_keys::key::KeyPair {
+fn to_russh_pk(p: &PrivateKey) -> russh::keys::PrivateKeyWithHashAlg {
     let openssh = p
         .to_openssh(ssh_key::LineEnding::LF)
         .expect("to_openssh")
         .to_string();
-    russh_keys::decode_secret_key(&openssh, None).expect("decode_secret_key")
+    let key = russh::keys::decode_secret_key(&openssh, None).expect("decode_secret_key");
+    russh::keys::PrivateKeyWithHashAlg::new(Arc::new(key), None)
 }
 
 #[allow(clippy::expect_used)] // test helper
@@ -42,24 +43,24 @@ async fn connect(server: &TestServer) -> russh::client::Handle<AcceptAnyClientHa
 async fn pubkey_auth_accepts_listed_user_with_correct_key() {
     let (server, user_key) = TestServer::with_default_users().await;
     let mut handle = connect(&server).await;
-    let kp = Arc::new(to_russh_keypair(&user_key));
+    let kp = to_russh_pk(&user_key);
     let ok = handle
         .authenticate_publickey("alice", kp)
         .await
         .expect("auth call");
-    assert!(ok, "alice with her key should be accepted");
+    assert!(ok.success(), "alice with her key should be accepted");
 }
 
 #[tokio::test]
 async fn pubkey_auth_rejects_wrong_user() {
     let (server, user_key) = TestServer::with_default_users().await;
     let mut handle = connect(&server).await;
-    let kp = Arc::new(to_russh_keypair(&user_key));
+    let kp = to_russh_pk(&user_key);
     let ok = handle
         .authenticate_publickey("mallory", kp)
         .await
         .expect("auth call");
-    assert!(!ok, "unknown user must be rejected");
+    assert!(!ok.success(), "unknown user must be rejected");
 }
 
 #[tokio::test]
@@ -69,12 +70,12 @@ async fn pubkey_auth_rejects_wrong_key_for_listed_user() {
 
     // A different user-key not in the allowlist.
     let imposter = common::random_ed25519_key();
-    let kp = Arc::new(to_russh_keypair(&imposter));
+    let kp = to_russh_pk(&imposter);
     let ok = handle
         .authenticate_publickey("alice", kp)
         .await
         .expect("auth call");
-    assert!(!ok, "alice with the wrong key must be rejected");
+    assert!(!ok.success(), "alice with the wrong key must be rejected");
 }
 
 #[tokio::test]
@@ -85,7 +86,10 @@ async fn password_auth_accepts_correct_password() {
         .authenticate_password("alice", "hunter2")
         .await
         .expect("auth call");
-    assert!(ok, "alice with the right password should be accepted");
+    assert!(
+        ok.success(),
+        "alice with the right password should be accepted"
+    );
 }
 
 #[tokio::test]
@@ -96,7 +100,7 @@ async fn password_auth_rejects_wrong_password() {
         .authenticate_password("alice", "wrong")
         .await
         .expect("auth call");
-    assert!(!ok);
+    assert!(!ok.success());
 }
 
 #[tokio::test]
@@ -107,7 +111,7 @@ async fn password_auth_rejects_unknown_user() {
         .authenticate_password("mallory", "anything")
         .await
         .expect("auth call");
-    assert!(!ok);
+    assert!(!ok.success());
 }
 
 #[tokio::test]
@@ -139,19 +143,22 @@ async fn pubkey_disabled_rejects_even_with_valid_key() {
     let mut handle = connect(&server).await;
 
     // Pubkey attempt: must fail regardless of allowlist.
-    let kp = Arc::new(to_russh_keypair(&user_key));
+    let kp = to_russh_pk(&user_key);
     let ok = handle
         .authenticate_publickey("alice", kp)
         .await
         .expect("auth call");
-    assert!(!ok, "pubkey must be rejected when method is disabled");
+    assert!(
+        !ok.success(),
+        "pubkey must be rejected when method is disabled"
+    );
 
     // Password still works.
     let ok2 = handle
         .authenticate_password("alice", "hunter2")
         .await
         .expect("auth call");
-    assert!(ok2, "password should still work");
+    assert!(ok2.success(), "password should still work");
 }
 
 #[tokio::test]
@@ -202,15 +209,15 @@ async fn server_drops_connection_after_max_auth_attempts() {
         .await
         .expect("call 3");
     assert!(
-        !r1 && !r2 && !r3,
+        !r1.success() && !r2.success() && !r3.success(),
         "all three wrong attempts must be rejected"
     );
 
     // A fourth attempt should fail to even complete: the connection has
-    // been torn down. We accept either `Ok(false)` or `Err(_)` here —
+    // been torn down. We accept either `Ok(Failure)` or `Err(_)` here —
     // both signal "no further auth possible".
-    if let Ok(success) = handle.authenticate_password("alice", "wrong-4").await {
-        assert!(!success, "post-limit attempt must not succeed");
+    if let Ok(result) = handle.authenticate_password("alice", "wrong-4").await {
+        assert!(!result.success(), "post-limit attempt must not succeed");
     }
 }
 
@@ -230,21 +237,21 @@ async fn allowlist_sentinel_compare_counter_increments_for_unknown_user() {
     // Two distinct rejection scenarios:
     // 1. Known user, wrong key -> reject.
     let imposter = common::random_ed25519_key();
-    let kp_imposter = Arc::new(to_russh_keypair(&imposter));
+    let kp_imposter = to_russh_pk(&imposter);
     let r1 = handle
         .authenticate_publickey("alice", kp_imposter)
         .await
         .expect("call");
-    assert!(!r1);
+    assert!(!r1.success());
 
     // 2. Unknown user, valid-looking key -> reject.
-    let kp_valid = Arc::new(to_russh_keypair(&user_key));
+    let kp_valid = to_russh_pk(&user_key);
     let r2 = handle
         .authenticate_publickey("mallory", kp_valid)
         .await
         .expect("call");
-    assert!(!r2);
+    assert!(!r2.success());
 
     // Both rejections must have produced the same outcome flavor from
-    // the client's perspective (Ok(false)).
+    // the client's perspective (Ok(Failure)).
 }
