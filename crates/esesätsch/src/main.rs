@@ -4,10 +4,23 @@
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::sync::Arc;
 
 use anyhow::{Context, Result, anyhow};
 use clap::{Parser, Subcommand};
-use esesaetsch_core::hostkey;
+use esesaetsch_core::auth::{
+    AllowlistPubkeyAuthenticator, DenyAllPasswordAuthenticator, PasswordAuthenticator,
+    PubkeyAuthenticator,
+};
+use esesaetsch_core::config::{Cli as CoreCli, Config, TomlConfig};
+use esesaetsch_core::pty::PtySpawner;
+mod real_auth;
+mod real_pty;
+mod service;
+use esesaetsch_core::server::EsesätschServer;
+use esesaetsch_core::{hostkey, logging};
+use real_pty::RealPtySpawner;
+use russh::server::Server;
 
 #[derive(Parser, Debug)]
 #[command(name = "esesätsch", about = "A strict cross-platform SSH server.")]
@@ -51,10 +64,27 @@ enum Command {
         #[arg(long)]
         host_key: PathBuf,
     },
+    /// Install a platform-native service unit (systemd / launchd / Windows
+    /// service) so the binary is supervised by the host OS. Requires
+    /// root / Administrator privileges.
+    InstallService,
+    /// Remove the platform-native service unit installed by `install-service`.
+    /// Requires root / Administrator privileges.
+    UninstallService,
 }
 
 fn main() -> ExitCode {
-    match run() {
+    let runtime = match tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("esesätsch: failed to start tokio runtime: {e}");
+            return ExitCode::from(1);
+        }
+    };
+    match runtime.block_on(run()) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("esesätsch: {e:#}");
@@ -63,22 +93,26 @@ fn main() -> ExitCode {
     }
 }
 
-fn run() -> Result<()> {
+async fn run() -> Result<()> {
     let args = Args::parse();
 
     let verbosity = if args.trace {
-        esesaetsch_core::logging::Verbosity::Trace
+        logging::Verbosity::Trace
     } else if args.debug {
-        esesaetsch_core::logging::Verbosity::Debug
+        logging::Verbosity::Debug
     } else {
-        esesaetsch_core::logging::Verbosity::Default
+        logging::Verbosity::Default
     };
-    // Errors from install are non-fatal (e.g., subscriber already set in tests).
-    let _ = esesaetsch_core::logging::install(verbosity);
+    let _ = logging::install(verbosity);
 
     match args.command.as_ref() {
         Some(Command::GenKey { host_key }) => cmd_gen_key(host_key),
-        Some(Command::Serve) | None => cmd_serve(&args),
+        Some(Command::InstallService) => {
+            let exe = std::env::current_exe().context("locating current binary")?;
+            service::install(&exe, args.config.as_deref())
+        }
+        Some(Command::UninstallService) => service::uninstall(),
+        Some(Command::Serve) | None => cmd_serve(&args).await,
     }
 }
 
@@ -95,12 +129,68 @@ fn cmd_gen_key(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn cmd_serve(args: &Args) -> Result<()> {
-    use esesaetsch_core::config::{Cli as CoreCli, Config, TomlConfig};
-    use std::fs;
+async fn cmd_serve(args: &Args) -> Result<()> {
+    let cfg = load_and_merge_config(args)?;
 
+    // Pubkey authenticator: built from the central allowlist in config.
+    let pubkey_auth: Arc<dyn PubkeyAuthenticator> = Arc::new(
+        AllowlistPubkeyAuthenticator::from_allowlist(&cfg.authorized_keys)
+            .context("building pubkey allowlist")?,
+    );
+
+    // Password authenticator: PAM on Unix (when built with `--features pam-auth`),
+    // LogonUserW on Windows (later). When password auth is disabled in
+    // config we use a deny-all stub — the server short-circuits before
+    // calling it anyway, but the type system needs a value.
+    let password_auth: Arc<dyn PasswordAuthenticator> = if cfg.password_enabled {
+        if let Some(native) = real_auth::build_native_password_auth("sshd") {
+            Arc::from(native)
+        } else {
+            return Err(anyhow!(
+                "password auth is enabled in config, but this binary was built \
+                 without an OS-native password backend; on Unix, rebuild with \
+                 `--features pam-auth`",
+            ));
+        }
+    } else {
+        Arc::new(DenyAllPasswordAuthenticator)
+    };
+
+    // PTY spawner: real `portable-pty`-backed implementation that spawns
+    // OS processes with allocated pseudo-terminals.
+    let spawner: Arc<dyn PtySpawner> = Arc::new(RealPtySpawner::new());
+
+    // Host key: load if present, else generate.
+    let host_key_path = cfg.host_key.clone();
+    let host_key = hostkey::load_or_generate(&host_key_path)
+        .with_context(|| format!("loading/generating host key at {}", host_key_path.display()))?;
+
+    let (mut server, russh_config) = EsesätschServer::new(
+        cfg.clone(),
+        pubkey_auth,
+        password_auth,
+        None, // cert auth not wired via russh yet
+        spawner,
+        host_key,
+    );
+
+    let listener = tokio::net::TcpListener::bind(cfg.bind)
+        .await
+        .with_context(|| format!("binding {}", cfg.bind))?;
+    tracing::info!(target: "esesaetsch", listen = %cfg.bind, "server listening");
+    println!("esesätsch: listening on {}", cfg.bind);
+
+    server
+        .run_on_socket(russh_config, &listener)
+        .await
+        .context("running server")?;
+    Ok(())
+}
+
+/// Read the optional TOML config and merge it with CLI flags.
+fn load_and_merge_config(args: &Args) -> Result<Config> {
     let toml = if let Some(path) = &args.config {
-        let raw = fs::read_to_string(path)
+        let raw = std::fs::read_to_string(path)
             .with_context(|| format!("reading config file {}", path.display()))?;
         Some(toml::from_str::<TomlConfig>(&raw).context("parsing config TOML")?)
     } else {
@@ -117,10 +207,5 @@ fn cmd_serve(args: &Args) -> Result<()> {
     };
     let cfg = Config::from_sources(&core_cli, toml).context("merging config")?;
     cfg.validate().context("validating config")?;
-
-    println!(
-        "serve: would listen on {} (full server wiring not yet hooked in this binary)",
-        cfg.bind,
-    );
-    Ok(())
+    Ok(cfg)
 }

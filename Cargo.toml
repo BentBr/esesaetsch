@@ -10,7 +10,10 @@ license = "Apache-2.0"
 repository = "https://github.com/BentBr/esesaetsch"
 
 [workspace.lints.rust]
-unsafe_code = "forbid"
+# Unsafe is denied by default but may be opted into per-module with an
+# explicit `#![allow(unsafe_code)]` and a justifying comment. Required
+# for thin OS-FFI wrappers (e.g., LogonUserW on Windows).
+unsafe_code = "deny"
 
 [workspace.lints.clippy]
 all      = { level = "deny", priority = -1 }
@@ -41,3 +44,14 @@ subtle      = "2"
 tempfile    = "3"
 assert_cmd  = "2"
 predicates  = "3"
+portable-pty = "0.8"
+tokio-util   = { version = "0.7", features = ["io"] }
+nix          = { version = "0.29", features = ["signal", "process", "user"] }
+pam          = "0.8"
+plist        = "1"
+windows      = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authentication_Identity",
+    "Win32_System_Threading",
+] }

@@ -37,6 +37,20 @@ use subtle::ConstantTimeEq;
 
 use crate::error::AuthError;
 
+/// A `PasswordAuthenticator` that rejects every credential.
+///
+/// Useful as a stand-in when password auth is disabled in config: the
+/// server never calls `verify` (it short-circuits on
+/// `password_enabled = false`), but the type system still wants a value.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct DenyAllPasswordAuthenticator;
+
+impl PasswordAuthenticator for DenyAllPasswordAuthenticator {
+    fn verify(&self, _user: &str, _password: &str) -> Result<(), AuthError> {
+        Err(AuthError::MethodDisabled)
+    }
+}
+
 /// Authenticate a `(username, password)` pair.
 pub trait PasswordAuthenticator: Send + Sync {
     /// Verify the credentials. Returns `Ok(())` on success or an `AuthError`
