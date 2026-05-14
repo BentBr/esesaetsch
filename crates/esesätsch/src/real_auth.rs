@@ -120,9 +120,9 @@ impl PasswordAuthenticator for LogonUserPasswordAuthenticator {
 mod windows_impl {
     use esesaetsch_core::error::AuthError;
     use windows::Win32::Foundation::{CloseHandle, HANDLE};
-    use windows::Win32::Security::Authentication::Identity::{
-        LOGON32_LOGON_NETWORK, LOGON32_PROVIDER_DEFAULT, LogonUserW,
-    };
+    // In `windows` 0.62 LogonUserW and the LOGON32_* constants live at
+    // Win32::Security directly (no longer under Authentication::Identity).
+    use windows::Win32::Security::{LOGON32_LOGON_NETWORK, LOGON32_PROVIDER_DEFAULT, LogonUserW};
     use windows::core::PCWSTR;
 
     fn to_wide(s: &str) -> Vec<u16> {
