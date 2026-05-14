@@ -59,6 +59,40 @@ pub enum HostKeyError {
     Generation(String),
 }
 
+/// Errors arising from certificate parsing or validation.
+///
+/// **Operator-only.** Never reaches the wire — every cert-validation
+/// failure produces a uniform `AuthError::CredentialMismatch` (or
+/// `UnknownUser`) over the SSH channel.
+#[derive(Debug, Clone, Error, PartialEq, Eq)]
+pub enum CertError {
+    /// Cert blob did not parse as an OpenSSH user certificate.
+    #[error("certificate blob is malformed: {0}")]
+    Malformed(String),
+    /// Cert was signed by a CA we do not trust.
+    #[error("certificate signed by untrusted CA")]
+    UntrustedCa,
+    /// CA signature verification failed.
+    #[error("certificate signature is invalid")]
+    BadSignature,
+    /// Current time is outside the cert's validity window.
+    #[error("certificate is expired or not yet valid")]
+    OutsideValidityWindow,
+    /// SSH username is not in the cert's `valid_principals` list.
+    #[error("ssh username is not in certificate principals")]
+    PrincipalMismatch,
+    /// Cert serial is in the configured revocation list.
+    #[error("certificate serial is revoked")]
+    Revoked,
+    /// Cert advertises a critical option we do not support; per RFC 4252 /
+    /// the OpenSSH cert spec, unknown critical options MUST cause rejection.
+    #[error("certificate uses unsupported critical option `{0}`")]
+    UnsupportedCriticalOption(String),
+    /// Cert is a host certificate, not a user certificate.
+    #[error("certificate is not a user certificate")]
+    WrongCertType,
+}
+
 /// Errors arising from authentication attempts.
 ///
 /// **Operator-only.** This is for server-side logs. Per spec §6.4 it must

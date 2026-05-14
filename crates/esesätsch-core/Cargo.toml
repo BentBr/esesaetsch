@@ -20,6 +20,7 @@ toml        = { workspace = true }
 clap        = { workspace = true }
 russh       = { workspace = true }
 russh-keys  = { workspace = true }
+ssh-key     = { workspace = true }
 rand        = { workspace = true }
 subtle      = { workspace = true }
 

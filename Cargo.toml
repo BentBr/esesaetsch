@@ -35,6 +35,7 @@ toml        = "0.8"
 clap        = { version = "4", features = ["derive"] }
 russh       = "0.45"
 russh-keys  = "0.45"
+ssh-key     = { version = "0.6", features = ["ed25519", "rsa", "alloc", "p256", "p384", "rand_core", "getrandom", "std"] }
 rand        = "0.8"
 subtle      = "2"
 tempfile    = "3"

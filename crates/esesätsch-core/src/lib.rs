@@ -7,6 +7,7 @@
 #![doc(html_root_url = "https://docs.rs/esesaetsch-core/0.1.0")]
 
 pub mod auth;
+pub mod cert;
 pub mod config;
 pub mod crypto;
 pub mod error;

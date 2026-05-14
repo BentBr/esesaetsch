@@ -528,6 +528,7 @@ dependencies = [
  "russh",
  "russh-keys",
  "serde",
+ "ssh-key",
  "subtle",
  "tempfile",
  "thiserror",
