@@ -3,6 +3,13 @@ name: ci
 on:
   pull_request:
     branches: [main]
+  # Run on every merge to main so the `ci.yml` badge tracks main's status.
+  # Without this, pull_request runs attribute to the PR head branch and
+  # workflow_call runs attribute to the calling workflow, leaving no
+  # ci.yml run on main — the badge then sticks on the most recent stale
+  # run regardless of branch.
+  push:
+    branches: [main]
   # Allow other workflows (release-please) to call this one for release PRs.
   workflow_call:
 
