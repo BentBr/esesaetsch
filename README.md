@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/BentBr/esesaetsch/actions/workflows/ci.yml/badge.svg)](https://github.com/BentBr/esesaetsch/actions/workflows/ci.yml)
 [![Release Please](https://github.com/BentBr/esesaetsch/actions/workflows/release-please.yml/badge.svg)](https://github.com/BentBr/esesaetsch/actions/workflows/release-please.yml)
+[![Latest release](https://img.shields.io/github/v/release/BentBr/esesaetsch?display_name=tag&sort=semver&label=release)](https://github.com/BentBr/esesaetsch/releases/latest)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Rust nightly](https://img.shields.io/badge/rust-nightly-orange.svg)](rust-toolchain.toml)
 [![Coverage: 100% core](https://img.shields.io/badge/coverage-100%25%20%7C%20core-brightgreen)](.github/workflows/ci.yml)
