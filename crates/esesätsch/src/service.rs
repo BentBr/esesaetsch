@@ -14,9 +14,9 @@
 
 use std::path::Path;
 
-use anyhow::{Context, Result};
 #[cfg(unix)]
 use anyhow::anyhow;
+use anyhow::{Context, Result};
 
 /// Where to install on Linux.
 #[cfg(target_os = "linux")]

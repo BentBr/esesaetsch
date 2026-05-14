@@ -65,7 +65,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      # @nightly matches rust-toolchain.toml — rustfmt rules can differ between
+      # channels and we want CI to match the local `cargo fmt` everyone runs.
+      - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt
       - run: cargo fmt --all -- --check
@@ -118,11 +120,16 @@ jobs:
   # ============================================================================
   # Tests on each runnable platform (Linux x86_64, macOS arm, Windows x86_64)
   # ============================================================================
+  # Test jobs use @nightly to match rust-toolchain.toml. With @stable, the
+  # cargo binary first tries to auto-install the pinned nightly via rustup,
+  # which can fail on macOS arm runners where the bootstrap shim takes
+  # precedence over the installed toolchain (the "rustup-init: unexpected
+  # argument 'test' found" error).
   test-linux-x64:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
       - name: Install PAM + libclang
         run: sudo apt-get update && sudo apt-get install -y libpam0g-dev libclang-dev
@@ -132,7 +139,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
       - name: Install LLVM (for libclang)
         run: brew install llvm
@@ -146,7 +153,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
       # No libclang needed: PAM is cfg(unix) only.
       - run: cargo test --workspace
