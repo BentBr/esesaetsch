@@ -3,7 +3,10 @@ resolver = "2"
 members = ["crates/esesätsch-core", "crates/esesätsch"]
 
 [workspace.package]
-version = "0.1.0"
+# `version` is intentionally NOT inherited via the workspace — release-please's
+# `rust` strategy expects `[package].version` directly in each member's
+# Cargo.toml, so each crate carries its own version and they stay in lock-step
+# by being updated together via release-please's `extra-files` list.
 edition = "2024"
 rust-version = "1.85"
 license = "Apache-2.0"
@@ -51,7 +54,7 @@ predicates  = "3"
 portable-pty = "0.9"
 tokio-util   = { version = "0.7", features = ["io"] }
 nix          = { version = "0.31", features = ["signal", "process", "user"] }
-pam          = "0.8"
+nonstick     = "0.1"   # safe PAM bindings; uses libpam-sys (stable)
 plist        = "1"
 windows      = { version = "0.62", features = [
     "Win32_Foundation",

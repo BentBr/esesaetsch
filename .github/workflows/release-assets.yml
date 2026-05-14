@@ -1,79 +1,29 @@
 name: release-assets
 
-# Triggered when release-please publishes a GitHub Release (after the
-# auto-generated release PR is merged into main). The flow is:
+# Build and attach release artefacts. Triggered:
+#   - by release-please.yml after `release_created: true`
+#   - directly on `release: published` (manual or non-release-please tag)
 #
-#   1. fmt + clippy + tests on each runnable platform
-#      (Linux x86_64, macOS aarch64, Windows x86_64)
-#   2. only if every check passes, cross-build all 5 release targets
-#      and upload them as assets on the just-published release.
-#
-# This guarantees that no broken artefact is ever attached to a release.
+# This workflow assumes the gate (fmt + clippy + tests + cross-builds)
+# has already run as part of the release PR's CI. We rebuild here for
+# release-profile artefacts and upload them.
 
 on:
+  workflow_call:
+    inputs:
+      tag_name:
+        description: Release tag to attach the assets to (e.g., v0.1.0)
+        required: true
+        type: string
   release:
     types: [published]
 
 permissions:
   contents: write
 
-# Notes on security: the only event-derived value we use in run steps is
-# `github.event.release.tag_name`. It is bound to an env var and passed
-# as a positional argument to `gh release upload`, never interpolated
-# into a shell command string.
-
 jobs:
-
-  # ---------- gate: format + lint + tests ----------
-
-  fmt:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-      - run: cargo fmt --all -- --check
-
-  clippy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
-        with:
-          components: clippy
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo +nightly clippy --workspace --all-targets -- -D clippy::all -D warnings -D clippy::pedantic -D clippy::nursery
-
-  test-linux-x64:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo test --workspace
-
-  test-macos-arm:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo test --workspace
-
-  test-windows-x64:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo test --workspace
-
-  # ---------- build + upload (only after gate is green) ----------
-
   build-and-upload:
     name: ${{ matrix.target }}
-    needs: [fmt, clippy, test-linux-x64, test-macos-arm, test-windows-x64]
     runs-on: ${{ matrix.runs-on }}
     strategy:
       fail-fast: false
@@ -83,27 +33,27 @@ jobs:
             runs-on: ubuntu-latest
             archive-ext: tar.gz
             bin-ext: ""
-            cross-linker: ""
+            install: linux
           - target: aarch64-unknown-linux-gnu
             runs-on: ubuntu-latest
             archive-ext: tar.gz
             bin-ext: ""
-            cross-linker: gcc-aarch64-linux-gnu
+            install: linux-arm
           - target: aarch64-apple-darwin
             runs-on: macos-latest
             archive-ext: tar.gz
             bin-ext: ""
-            cross-linker: ""
+            install: macos
           - target: x86_64-pc-windows-msvc
             runs-on: windows-latest
             archive-ext: zip
             bin-ext: .exe
-            cross-linker: ""
+            install: windows
           - target: aarch64-pc-windows-msvc
             runs-on: windows-latest
             archive-ext: zip
             bin-ext: .exe
-            cross-linker: ""
+            install: windows
     steps:
       - uses: actions/checkout@v4
 
@@ -113,17 +63,45 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Install cross linker (if needed)
-        if: matrix.cross-linker != ''
-        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.cross-linker }}
+      - name: Install build deps (Linux x86_64)
+        if: matrix.install == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y libpam0g-dev libclang-dev
+
+      - name: Install build deps (Linux ARM64 cross)
+        if: matrix.install == 'linux-arm'
+        run: |
+          sudo dpkg --add-architecture arm64
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu libclang-dev libpam0g-dev:arm64
+
+      - name: Install build deps (macOS)
+        if: matrix.install == 'macos'
+        run: brew install llvm
 
       - name: Build release binary
+        env:
+          PKG_CONFIG_ALLOW_CROSS: ${{ matrix.install == 'linux-arm' && '1' || '' }}
+          LIBCLANG_PATH:          ${{ matrix.install == 'macos' && '/opt/homebrew/opt/llvm/lib' || '' }}
+          DYLD_FALLBACK_LIBRARY_PATH: ${{ matrix.install == 'macos' && '/opt/homebrew/opt/llvm/lib' || '' }}
         run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Resolve tag name
+        id: tag
+        shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag_name }}
+          EVENT_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if [[ -n "${INPUT_TAG:-}" ]]; then
+            echo "tag=$INPUT_TAG" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=$EVENT_TAG" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Package (unix)
         if: matrix.archive-ext == 'tar.gz'
         env:
-          TAG: ${{ github.event.release.tag_name }}
+          TAG:    ${{ steps.tag.outputs.tag }}
           TARGET: ${{ matrix.target }}
         run: |
           set -euxo pipefail
@@ -137,7 +115,7 @@ jobs:
       - name: Package (windows)
         if: matrix.archive-ext == 'zip'
         env:
-          TAG: ${{ github.event.release.tag_name }}
+          TAG:    ${{ steps.tag.outputs.tag }}
           TARGET: ${{ matrix.target }}
         shell: pwsh
         run: |
@@ -151,6 +129,6 @@ jobs:
       - name: Upload release asset
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.event.release.tag_name }}
+          TAG:      ${{ steps.tag.outputs.tag }}
         run: gh release upload "$TAG" "$ASSET" --clobber
         shell: bash

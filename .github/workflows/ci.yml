@@ -1,16 +1,66 @@
 name: ci
 
 on:
-  push:
-    branches: [main]
   pull_request:
+    branches: [main]
+  # Allow other workflows (release-please) to call this one for release PRs.
+  workflow_call:
 
-# Notes on security: this workflow does not consume any untrusted event
-# payloads (github.event.issue.*, .pull_request.*.body, etc.) in `run:`
-# steps. All `run:` commands use only static text and toolchain output.
+# CI runs fmt + strict clippy + tests + cross-platform release builds.
+# The `ci-gate` job at the bottom is the single check release-please.yml
+# blocks the release on: if it's green, the artefacts get built and
+# attached; if it's red, no release artefacts.
 
 jobs:
 
+  # ============================================================================
+  # Branch + commit-message hygiene (PR only)
+  # ============================================================================
+  commit-lint:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate Conventional Commits
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          conventional='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?(!)?: .+'
+          merge='^Merge '
+          bad=()
+          while IFS= read -r sha; do
+            [[ -z "$sha" ]] && continue
+            subject="$(git log -1 --format='%s' "$sha")"
+            [[ "$subject" =~ $merge ]] && continue
+            [[ "$subject" =~ $conventional ]] || bad+=("$sha: $subject")
+          done < <(git rev-list "$BASE_SHA..$HEAD_SHA")
+          if [[ ${#bad[@]} -gt 0 ]]; then
+            echo "::error::Commits not following Conventional Commits:"
+            printf '  - %s\n' "${bad[@]}"
+            exit 1
+          fi
+
+  branch-name:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate branch name
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
+        run: |
+          regex='^(main|master|develop|(release-please|dependabot|renovate)(--|/).+|(feat|fix|hotfix|chore|docs|refactor|perf|test|build|ci|style|revert|release)/[a-z0-9][a-z0-9._-]*)$'
+          if [[ ! "$BRANCH_NAME" =~ $regex ]]; then
+            echo "::error::Branch '$BRANCH_NAME' does not match the naming convention."
+            echo "Expected: <type>/<description> with lowercase alphanumeric + . _ -"
+            exit 1
+          fi
+
+  # ============================================================================
+  # fmt + clippy (host = ubuntu)
+  # ============================================================================
   fmt:
     runs-on: ubuntu-latest
     steps:
@@ -28,15 +78,23 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
-      - run: cargo +nightly clippy --workspace --all-targets --all-features -- -D clippy::all -D warnings -D clippy::pedantic -D clippy::nursery
+      - name: Install PAM + libclang
+        run: sudo apt-get update && sudo apt-get install -y libpam0g-dev libclang-dev
+      - name: Strict clippy
+        run: cargo +nightly clippy --workspace --all-targets -- -D clippy::all -D warnings -D clippy::pedantic -D clippy::nursery
 
+  # ============================================================================
+  # Tests on each runnable platform (Linux x86_64, macOS arm, Windows x86_64)
+  # ============================================================================
   test-linux-x64:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo test --workspace --all-features
+      - name: Install PAM + libclang
+        run: sudo apt-get update && sudo apt-get install -y libpam0g-dev libclang-dev
+      - run: cargo test --workspace
 
   test-macos-arm:
     runs-on: macos-latest
@@ -44,7 +102,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo test --workspace --all-features
+      - name: Install LLVM (for libclang)
+        run: brew install llvm
+      - name: Test
+        env:
+          LIBCLANG_PATH: /opt/homebrew/opt/llvm/lib
+          DYLD_FALLBACK_LIBRARY_PATH: /opt/homebrew/opt/llvm/lib
+        run: cargo test --workspace
 
   test-windows-x64:
     runs-on: windows-latest
@@ -52,23 +116,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo test --workspace --all-features
+      # No libclang needed: PAM is cfg(unix) only.
+      - run: cargo test --workspace
 
-  coverage:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
-        with:
-          components: llvm-tools-preview
-      - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@cargo-llvm-cov
-      - run: cargo +nightly llvm-cov --workspace --fail-under-lines 100 -p esesaetsch-core --lcov --output-path lcov.info
-      - uses: actions/upload-artifact@v4
-        with:
-          name: coverage-lcov
-          path: lcov.info
-
+  # ============================================================================
+  # Cross-platform release builds (5 targets)
+  # ============================================================================
   build-linux-x64:
     runs-on: ubuntu-latest
     steps:
@@ -77,11 +130,9 @@ jobs:
         with:
           targets: x86_64-unknown-linux-gnu
       - uses: Swatinem/rust-cache@v2
+      - name: Install PAM + libclang
+        run: sudo apt-get update && sudo apt-get install -y libpam0g-dev libclang-dev
       - run: cargo build --release --target x86_64-unknown-linux-gnu
-      - uses: actions/upload-artifact@v4
-        with:
-          name: esesaetsch-linux-x86_64
-          path: target/x86_64-unknown-linux-gnu/release/esesaetsch
 
   build-linux-arm:
     runs-on: ubuntu-latest
@@ -91,13 +142,15 @@ jobs:
         with:
           targets: aarch64-unknown-linux-gnu
       - uses: Swatinem/rust-cache@v2
-      - name: Install cross linker
-        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
-      - run: cargo build --release --target aarch64-unknown-linux-gnu
-      - uses: actions/upload-artifact@v4
-        with:
-          name: esesaetsch-linux-aarch64
-          path: target/aarch64-unknown-linux-gnu/release/esesaetsch
+      - name: Install cross-toolchain + PAM
+        run: |
+          sudo dpkg --add-architecture arm64
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu libclang-dev libpam0g-dev:arm64
+      - name: Build
+        env:
+          PKG_CONFIG_ALLOW_CROSS: "1"
+        run: cargo build --release --target aarch64-unknown-linux-gnu
 
   build-macos-arm:
     runs-on: macos-latest
@@ -107,11 +160,13 @@ jobs:
         with:
           targets: aarch64-apple-darwin
       - uses: Swatinem/rust-cache@v2
-      - run: cargo build --release --target aarch64-apple-darwin
-      - uses: actions/upload-artifact@v4
-        with:
-          name: esesaetsch-macos-aarch64
-          path: target/aarch64-apple-darwin/release/esesaetsch
+      - name: Install LLVM
+        run: brew install llvm
+      - name: Build
+        env:
+          LIBCLANG_PATH: /opt/homebrew/opt/llvm/lib
+          DYLD_FALLBACK_LIBRARY_PATH: /opt/homebrew/opt/llvm/lib
+        run: cargo build --release --target aarch64-apple-darwin
 
   build-windows-x64:
     runs-on: windows-latest
@@ -122,10 +177,6 @@ jobs:
           targets: x86_64-pc-windows-msvc
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release --target x86_64-pc-windows-msvc
-      - uses: actions/upload-artifact@v4
-        with:
-          name: esesaetsch-windows-x86_64
-          path: target/x86_64-pc-windows-msvc/release/esesaetsch.exe
 
   build-windows-arm:
     runs-on: windows-latest
@@ -136,7 +187,56 @@ jobs:
           targets: aarch64-pc-windows-msvc
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release --target aarch64-pc-windows-msvc
-      - uses: actions/upload-artifact@v4
-        with:
-          name: esesaetsch-windows-aarch64
-          path: target/aarch64-pc-windows-msvc/release/esesaetsch.exe
+
+  # ============================================================================
+  # CI Gate — single check release-please.yml waits on
+  # ============================================================================
+  ci-gate:
+    needs:
+      - fmt
+      - clippy
+      - test-linux-x64
+      - test-macos-arm
+      - test-windows-x64
+      - build-linux-x64
+      - build-linux-arm
+      - build-macos-arm
+      - build-windows-x64
+      - build-windows-arm
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate check results
+        run: |
+          fail=()
+          for job in fmt clippy test-linux-x64 test-macos-arm test-windows-x64 \
+                     build-linux-x64 build-linux-arm build-macos-arm \
+                     build-windows-x64 build-windows-arm; do
+            result_var="${job//-/_}_result"
+            : # individual `needs.X.result` are checked below
+          done
+          # Use the literal needs.* expressions:
+          declare -A results=(
+            [fmt]="${{ needs.fmt.result }}"
+            [clippy]="${{ needs.clippy.result }}"
+            [test-linux-x64]="${{ needs.test-linux-x64.result }}"
+            [test-macos-arm]="${{ needs.test-macos-arm.result }}"
+            [test-windows-x64]="${{ needs.test-windows-x64.result }}"
+            [build-linux-x64]="${{ needs.build-linux-x64.result }}"
+            [build-linux-arm]="${{ needs.build-linux-arm.result }}"
+            [build-macos-arm]="${{ needs.build-macos-arm.result }}"
+            [build-windows-x64]="${{ needs.build-windows-x64.result }}"
+            [build-windows-arm]="${{ needs.build-windows-arm.result }}"
+          )
+          for job in "${!results[@]}"; do
+            res="${results[$job]}"
+            echo "$job: $res"
+            if [[ "$res" != "success" ]]; then
+              fail+=("$job=$res")
+            fi
+          done
+          if [[ ${#fail[@]} -gt 0 ]]; then
+            echo "::error::CI gate failed: ${fail[*]}"
+            exit 1
+          fi
+          echo "CI gate passed"

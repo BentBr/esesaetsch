@@ -1,6 +1,6 @@
 [package]
 name        = "esesaetsch"
-version.workspace      = true
+version     = "0.1.0"   # kept in lock-step with crates/esesätsch-core by release-please
 edition.workspace      = true
 rust-version.workspace = true
 license.workspace      = true
@@ -26,23 +26,19 @@ toml           = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 nix = { workspace = true }
-pam = { workspace = true, optional = true }
+# PAM is a hard dependency on Unix. The underlying `pam-sys` crate uses
+# `bindgen` at build time, which needs `libclang`.
+#   macOS:  comes with `xcode-select --install`. If the build still can't
+#           find `libclang.dylib`, set
+#           `LIBCLANG_PATH=/Library/Developer/CommandLineTools/usr/lib`.
+#   Debian/Ubuntu: `sudo apt-get install -y libpam0g-dev libclang-dev`.
+nonstick = { workspace = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 plist = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 windows = { workspace = true }
-
-[features]
-# OS-native password authentication via PAM on Unix. Requires libclang
-# at build time (for the underlying `pam-sys` bindgen step). Most CI
-# images already include it; macOS dev machines may need:
-#     brew install llvm
-# Linux dev:
-#     sudo apt-get install libpam0g-dev libclang-dev
-default = []
-pam-auth = ["dep:pam"]
 
 [dev-dependencies]
 assert_cmd  = { workspace = true }

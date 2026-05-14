@@ -163,9 +163,8 @@ async fn cmd_serve(args: &Args) -> Result<()> {
             Arc::from(native)
         } else {
             return Err(anyhow!(
-                "password auth is enabled in config, but this binary was built \
-                 without an OS-native password backend; on Unix, rebuild with \
-                 `--features pam-auth`",
+                "password auth is enabled in config, but no OS-native password \
+                 backend is available on this platform",
             ));
         }
     } else {

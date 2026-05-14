@@ -1,12 +1,12 @@
 //! OS-native password authentication.
 //!
-//! On Unix (with the `pam-auth` feature enabled) this dispatches to PAM
-//! via the `pam` crate. On Windows it will dispatch to `LogonUserW` in
-//! a follow-up task. Without the `pam-auth` feature, attempts to enable
-//! password auth in the config are refused at startup by the binary.
+//! On Unix this dispatches to PAM via the `pam` crate (which transitively
+//! requires `libclang` at build time — see the binary `Cargo.toml` for
+//! platform-specific install notes). On Windows it dispatches to
+//! `LogonUserW` via the `windows` crate.
 
 use esesaetsch_core::auth::PasswordAuthenticator;
-#[cfg(any(all(unix, feature = "pam-auth"), windows))]
+#[cfg(any(unix, windows))]
 use esesaetsch_core::error::AuthError;
 
 /// PAM-backed `PasswordAuthenticator`. Each call to `verify` opens a fresh
@@ -16,12 +16,12 @@ use esesaetsch_core::error::AuthError;
 /// - `sshd` — piggyback on OpenSSH's existing PAM config.
 /// - `esesaetsch` — install your own custom service file via the
 ///   `install-service` subcommand.
-#[cfg(all(unix, feature = "pam-auth"))]
+#[cfg(unix)]
 pub struct PamPasswordAuthenticator {
     service_name: String,
 }
 
-#[cfg(all(unix, feature = "pam-auth"))]
+#[cfg(unix)]
 impl PamPasswordAuthenticator {
     /// Create a new authenticator against the given PAM service.
     #[must_use]
@@ -32,17 +32,53 @@ impl PamPasswordAuthenticator {
     }
 }
 
-#[cfg(all(unix, feature = "pam-auth"))]
+/// Minimal `nonstick` conversation handler. PAM modules call into this
+/// to get the username (plain prompt) and the password (masked prompt).
+/// We hand back the fixed credentials we already have, ignore info/error
+/// messages, and refuse radio/binary prompts (no PAM module our use case
+/// supports should issue those).
+#[cfg(unix)]
+struct FixedConv {
+    username: String,
+    password: String,
+}
+
+#[cfg(unix)]
+impl nonstick::ConversationAdapter for FixedConv {
+    fn prompt(
+        &self,
+        _request: impl AsRef<std::ffi::OsStr>,
+    ) -> nonstick::Result<std::ffi::OsString> {
+        Ok(self.username.clone().into())
+    }
+
+    fn masked_prompt(
+        &self,
+        _request: impl AsRef<std::ffi::OsStr>,
+    ) -> nonstick::Result<std::ffi::OsString> {
+        Ok(self.password.clone().into())
+    }
+
+    fn error_msg(&self, _message: impl AsRef<std::ffi::OsStr>) {}
+    fn info_msg(&self, _message: impl AsRef<std::ffi::OsStr>) {}
+}
+
+#[cfg(unix)]
 impl PasswordAuthenticator for PamPasswordAuthenticator {
     fn verify(&self, user: &str, password: &str) -> Result<(), AuthError> {
-        let mut client = pam::Client::with_password(&self.service_name)
-            .map_err(|e| AuthError::Backend(format!("pam init: {e}")))?;
-        client.conversation_mut().set_credentials(user, password);
-        client
-            .authenticate()
+        use nonstick::{AuthnFlags, ConversationAdapter, Transaction, TransactionBuilder};
+
+        let conv = FixedConv {
+            username: user.to_owned(),
+            password: password.to_owned(),
+        };
+        let mut txn = TransactionBuilder::new_with_service(&self.service_name)
+            .username(user)
+            .build(conv.into_conversation())
+            .map_err(|e| AuthError::Backend(format!("pam txn: {e}")))?;
+        txn.authenticate(AuthnFlags::empty())
             .map_err(|_| AuthError::CredentialMismatch)?;
-        client
-            .open_session()
+        txn.account_management(AuthnFlags::empty())
             .map_err(|_| AuthError::CredentialMismatch)?;
         Ok(())
     }
@@ -53,7 +89,7 @@ impl PasswordAuthenticator for PamPasswordAuthenticator {
 /// The token returned by `LogonUserW` is closed immediately; the
 /// implementation only cares whether authentication succeeded. Process
 /// spawning as the authenticated user (`CreateProcessAsUserW`) is a
-/// separate concern and lives in `real_user`.
+/// separate concern.
 #[cfg(windows)]
 pub struct LogonUserPasswordAuthenticator;
 
@@ -109,7 +145,6 @@ mod windows_impl {
         };
         match result {
             Ok(()) => {
-                // Token is valid; we don't need it (yet). Close.
                 if !token.is_invalid() {
                     let _ = unsafe { CloseHandle(token) };
                 }
@@ -120,23 +155,26 @@ mod windows_impl {
     }
 }
 
-/// Build the OS-native authenticator for the current target/feature set.
+/// Build the OS-native authenticator for the current target.
 ///
-/// Returns `None` when no backend is available — the caller should refuse
-/// to enable password auth in that case.
-#[cfg(all(unix, feature = "pam-auth"))]
+/// The `Option` is kept (rather than a hard `Box`) so the same call-site
+/// in `main.rs` works on any future target where no backend exists; on
+/// Unix and Windows the function unconditionally returns `Some(...)`.
+#[cfg(unix)]
 #[must_use]
+#[allow(clippy::unnecessary_wraps)] // signature mirrors the no-backend fallback
 pub fn build_native_password_auth(service_name: &str) -> Option<Box<dyn PasswordAuthenticator>> {
     Some(Box::new(PamPasswordAuthenticator::new(service_name)))
 }
 
 #[cfg(windows)]
 #[must_use]
+#[allow(clippy::unnecessary_wraps)]
 pub fn build_native_password_auth(_service_name: &str) -> Option<Box<dyn PasswordAuthenticator>> {
     Some(Box::new(LogonUserPasswordAuthenticator::new()))
 }
 
-#[cfg(not(any(all(unix, feature = "pam-auth"), windows)))]
+#[cfg(not(any(unix, windows)))]
 #[must_use]
 pub fn build_native_password_auth(_service_name: &str) -> Option<Box<dyn PasswordAuthenticator>> {
     None
