@@ -70,7 +70,11 @@ jobs:
           components: rustfmt
       - run: cargo fmt --all -- --check
 
-  clippy:
+  # Strict clippy on every host OS. Each runner exercises the cfg branches
+  # that compile on that OS: Linux/macOS hit the PAM + Unix shell paths,
+  # Windows hits LogonUserW + service.rs's windows arm. Without this fan-out
+  # a windows-only typo would only fail on a binary build, after clippy.
+  clippy-linux-x64:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -80,6 +84,34 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install PAM + libclang
         run: sudo apt-get update && sudo apt-get install -y libpam0g-dev libclang-dev
+      - name: Strict clippy
+        run: cargo +nightly clippy --workspace --all-targets -- -D clippy::all -D warnings -D clippy::pedantic -D clippy::nursery
+
+  clippy-macos-arm:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Install LLVM (for libclang)
+        run: brew install llvm
+      - name: Strict clippy
+        env:
+          LIBCLANG_PATH: /opt/homebrew/opt/llvm/lib
+          DYLD_FALLBACK_LIBRARY_PATH: /opt/homebrew/opt/llvm/lib
+        run: cargo +nightly clippy --workspace --all-targets -- -D clippy::all -D warnings -D clippy::pedantic -D clippy::nursery
+
+  clippy-windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      # No libclang needed: PAM is cfg(unix) only.
       - name: Strict clippy
         run: cargo +nightly clippy --workspace --all-targets -- -D clippy::all -D warnings -D clippy::pedantic -D clippy::nursery
 
@@ -195,7 +227,9 @@ jobs:
   ci-gate:
     needs:
       - fmt
-      - clippy
+      - clippy-linux-x64
+      - clippy-macos-arm
+      - clippy-windows-x64
       - test-linux-x64
       - test-macos-arm
       - test-windows-x64
@@ -210,16 +244,11 @@ jobs:
       - name: Aggregate check results
         run: |
           fail=()
-          for job in fmt clippy test-linux-x64 test-macos-arm test-windows-x64 \
-                     build-linux-x64 build-linux-arm build-macos-arm \
-                     build-windows-x64 build-windows-arm; do
-            result_var="${job//-/_}_result"
-            : # individual `needs.X.result` are checked below
-          done
-          # Use the literal needs.* expressions:
           declare -A results=(
             [fmt]="${{ needs.fmt.result }}"
-            [clippy]="${{ needs.clippy.result }}"
+            [clippy-linux-x64]="${{ needs.clippy-linux-x64.result }}"
+            [clippy-macos-arm]="${{ needs.clippy-macos-arm.result }}"
+            [clippy-windows-x64]="${{ needs.clippy-windows-x64.result }}"
             [test-linux-x64]="${{ needs.test-linux-x64.result }}"
             [test-macos-arm]="${{ needs.test-macos-arm.result }}"
             [test-windows-x64]="${{ needs.test-windows-x64.result }}"
