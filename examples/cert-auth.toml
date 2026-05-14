@@ -1,0 +1,43 @@
+# examples/cert-auth.toml
+# -------------------------------------------------------------------------
+# OpenSSH certificate authentication. Instead of (or in addition to) a
+# per-user public-key allowlist, users present a signed certificate
+# issued by a trusted CA.
+#
+# Setup overview:
+#   1. Generate a CA key once:
+#        ssh-keygen -t ed25519 -f ./ca_key -C "esesaetsch CA"
+#   2. Sign each user's pubkey with the CA, embedding their principals:
+#        ssh-keygen -s ca_key -I "alice@host" -n alice \
+#                   -V +52w \
+#                   alice_id_ed25519.pub
+#      Produces `alice_id_ed25519-cert.pub`.
+#   3. The user connects with `ssh -i alice_id_ed25519 …` — the cert is
+#      offered automatically because OpenSSH co-locates `*.cert.pub`.
+#
+# Operator benefits:
+#   - Revoke by leaving a serial out of the next batch (or list it in
+#     `revoked_serials` below for an explicit deny).
+#   - Rotate trust by re-signing user keys, no edit to authorized_keys.
+
+[server]
+bind     = "0.0.0.0"
+port     = 2222
+host_key = "./host_key"
+
+[auth]
+password_enabled  = false
+pubkey_enabled    = false   # disable raw pubkey to force everyone through certs
+cert_enabled      = true
+max_auth_attempts = 3
+
+[auth.ca]
+# One or more CA public keys (the contents of `./ca_key.pub`).
+trusted = [
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAEXAMPLE_PRIMARY_CA primary-ca",
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAEXAMPLE_BACKUP_CA  backup-ca",
+]
+
+# Optional explicit revocation by certificate serial number. The CA
+# embeds a serial when signing (`-z <n>` flag of `ssh-keygen -s`).
+revoked_serials = [17, 42]

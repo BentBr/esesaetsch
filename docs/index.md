@@ -2,10 +2,21 @@
 
 A strict, cross-platform SSH server written in Rust.
 
-This documentation hub will be filled out in a later development pass. For
-now, refer to:
+## User guides
 
-- The [root `README.md`](../README.md) for status, install, and quick-start.
-- The crate-level rustdoc (`cargo doc --open -p esesaetsch-core`) for the
-  authoritative reference on every public type and function.
-- The `LICENSE` and `NOTICE` files at the repo root for licensing terms.
+- [Configuration reference](user-guide/configuration.md) — every TOML field, defaults, security notes
+- [CLI reference](user-guide/cli-reference.md) — every subcommand and flag with examples
+
+## Development
+
+- [Development guide](development.md) — build, test, release, project layout
+
+## Examples
+
+- [`examples/`](../examples/) — five ready-to-edit configs covering common scenarios
+
+## See also
+
+- [Root `README.md`](../README.md) — features, quick-start, badges
+- [`CHANGELOG.md`](../CHANGELOG.md) — release-please-managed change history
+- [`LICENSE`](../LICENSE) and [`NOTICE`](../NOTICE) — Apache 2.0

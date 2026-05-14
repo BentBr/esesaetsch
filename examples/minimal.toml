@@ -1,0 +1,26 @@
+# examples/minimal.toml
+# -------------------------------------------------------------------------
+# Smallest config that runs: one user, pubkey auth only.
+#
+# Start the server:
+#   esesätsch serve --config examples/minimal.toml
+#
+# Connect:
+#   ssh -p 2222 alice@host
+
+[server]
+bind     = "127.0.0.1"   # listen only on loopback for local testing
+port     = 2222
+host_key = "./host_key"  # generated on first run if absent
+
+[auth]
+password_enabled  = false   # PAM not used in this example
+pubkey_enabled    = true
+cert_enabled      = false
+max_auth_attempts = 3
+
+[auth.authorized_keys]
+# Each entry: username = [ "ssh-<alg> <base64> <comment>", ... ]
+alice = [
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAEXAMPLE… alice@laptop",
+]

@@ -1,0 +1,34 @@
+# examples/pubkey-only.toml
+# -------------------------------------------------------------------------
+# Pubkey-only multi-user setup. Password and certificate auth are disabled.
+# Each connecting user is matched against the central allowlist below.
+#
+# Operator workflow:
+#   1. Collect users' public keys (the contents of their ~/.ssh/id_ed25519.pub
+#      etc.) and paste each into the array for their username.
+#   2. Start: `esesätsch serve --config examples/pubkey-only.toml`
+#   3. Users connect with: `ssh -p 2222 <their-username>@<host>`
+#
+# Users can each list multiple keys (work laptop + home machine, …) — any
+# one of them is accepted.
+
+[server]
+bind     = "0.0.0.0"
+port     = 2222
+host_key = "/etc/esesätsch/host_key"   # absolute path; auto-generated on first run
+
+[auth]
+password_enabled  = false
+pubkey_enabled    = true
+cert_enabled      = false
+max_auth_attempts = 3
+
+[auth.authorized_keys]
+alice = [
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAEXAMPLE_ALICE_1 alice@laptop",
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAEXAMPLE_ALICE_2 alice@home",
+]
+
+bob = [
+    "rsa-sha2-512 AAAAB3NzaC1yc2EAAAADAQABAAABAQEXAMPLE_BOB bob@workstation",
+]

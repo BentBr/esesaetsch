@@ -1,0 +1,83 @@
+# examples/full.toml
+# -------------------------------------------------------------------------
+# Every config field, with explanatory comments. Use this as a reference
+# when assembling your own config.
+#
+# Precedence: CLI flag > TOML value > built-in default.
+
+[server]
+# Listen address. Can be IPv4 ("0.0.0.0", "127.0.0.1") or IPv6 ("::").
+# Default: "0.0.0.0".
+bind = "0.0.0.0"
+
+# TCP port. Default: 2222 (kept off the privileged range so the binary
+# can run without root; switch to 22 if you want to be the system sshd).
+port = 2222
+
+# Path to the host key file. The server reads it on startup; if absent,
+# it auto-generates an Ed25519 key with 0600 permissions on Unix. Use the
+# `gen-key` subcommand to create one explicitly.
+# Default: "./host_key".
+host_key = "/etc/esesätsch/host_key"
+
+[auth]
+# Enable password authentication against the OS user database.
+# Linux/macOS: PAM (service file "sshd" by default).
+# Windows: LogonUserW.
+# Default: false.
+password_enabled = true
+
+# Enable plain public-key authentication against the [auth.authorized_keys]
+# allowlist below.
+# Default: true.
+pubkey_enabled = true
+
+# Enable OpenSSH certificate authentication. Requires a non-empty
+# [auth.ca].trusted list. Certs are validated for: trusted CA, signature,
+# validity window, principal match, serial not revoked, and unknown
+# critical options rejected (fail-closed per the OpenSSH cert spec).
+# Default: false.
+cert_enabled = true
+
+# Maximum failed auth attempts before the server drops the connection.
+# Default: 3.
+max_auth_attempts = 3
+
+[auth.authorized_keys]
+# Per-user list of accepted public keys. Each value is an array of
+# OpenSSH-format key lines ("type base64 [comment]"). One user can have
+# multiple keys — any one of them is accepted.
+#
+# Only consulted when `pubkey_enabled = true`.
+alice = [
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAEXAMPLE_ALICE_1 alice@laptop",
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAEXAMPLE_ALICE_2 alice@home",
+]
+bob = [
+    "rsa-sha2-512 AAAAB3NzaC1yc2EAAAADAQABAAABAQEXAMPLE_BOB bob@workstation",
+]
+
+[auth.ca]
+# Trusted certificate authorities. Only consulted when
+# `cert_enabled = true`. Each entry is a CA public key in
+# OpenSSH "type base64 [comment]" format — typically the contents of
+# the CA's `.pub` file.
+trusted = [
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAEXAMPLE_CA primary-ca",
+]
+
+# Optional explicit revocation list. Cert serials in this list are
+# refused even if everything else (signature, validity, principal)
+# checks out. Useful for keys that haven't expired yet but must be
+# invalidated immediately.
+revoked_serials = []
+
+[logging]
+# Default tracing level. CLI flags `--debug` (sets DEBUG) and `--trace`
+# (sets TRACE + enables packet dumping) override this.
+# Allowed: off | error | warn | info | debug | trace.
+level = "info"
+
+# Enable raw SSH packet dumps in the trace output. Same effect as
+# passing `--trace` on the CLI.
+packet_trace = false

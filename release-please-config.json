@@ -8,13 +8,20 @@
   "prerelease": false,
   "packages": {
     ".": {
-      "release-type": "rust",
-      "component": "esesätsch",
+      "release-type": "simple",
       "package-name": "esesätsch",
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
-        "crates/esesätsch-core/Cargo.toml",
-        "crates/esesätsch/Cargo.toml"
+        {
+          "type": "toml",
+          "path": "crates/esesätsch-core/Cargo.toml",
+          "jsonpath": "$.package.version"
+        },
+        {
+          "type": "toml",
+          "path": "crates/esesätsch/Cargo.toml",
+          "jsonpath": "$.package.version"
+        }
       ]
     }
   }
