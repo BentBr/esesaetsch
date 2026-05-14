@@ -232,6 +232,55 @@ async fn window_change_propagates_to_pty_resize() {
 }
 
 #[tokio::test]
+async fn client_disconnect_kills_the_child() {
+    // Spec §8: when the client closes the channel / drops the connection,
+    // the server-side session task calls `PtyChild::kill` so the child
+    // doesn't outlive the session.
+    let spawner = Arc::new(MockPtySpawner::new());
+    spawner.set_config(MockChildConfig {
+        // Long-running child that never exits on its own.
+        exit_status: None,
+        ..MockChildConfig::default()
+    });
+
+    let (server, user_key) = server_with_spawner(spawner.clone()).await;
+    {
+        let handle = connect_and_auth(&server, &user_key).await;
+        let channel = handle
+            .channel_open_session()
+            .await
+            .expect("channel_open_session");
+        channel
+            .exec(true, "/bin/sleep 9999")
+            .await
+            .expect("request");
+
+        // Give the session task a moment to spawn the child.
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        // Channel and handle drop here — connection torn down.
+    }
+
+    // Poll for the kill to land (the kill happens once the control_tx is
+    // dropped server-side and the session loop sees `recv() -> None`).
+    let deadline = std::time::Instant::now() + Duration::from_secs(3);
+    loop {
+        let killed = spawner
+            .last_record()
+            .expect("record")
+            .killed
+            .load(std::sync::atomic::Ordering::Relaxed);
+        if killed {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() <= deadline,
+            "server did not kill child within 3s of client disconnect",
+        );
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+}
+
+#[tokio::test]
 async fn spawn_failure_emits_exit_status_one_with_no_stderr() {
     // Spec §6.4 rule 6: when the spawner errors, the client sees
     // exit-status=1 and the channel closes — no stderr description ever

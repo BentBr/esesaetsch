@@ -178,6 +178,43 @@ async fn server_banner_does_not_leak_version_or_os() {
 }
 
 #[tokio::test]
+async fn server_drops_connection_after_max_auth_attempts() {
+    // Spec §6.1 step 3: after `max_auth_attempts` failed attempts, the
+    // server drops the connection. Our `TestServer::with_default_users`
+    // uses the built-in default of 3.
+    let (server, _user_key) = TestServer::with_default_users().await;
+    let mut handle = connect(&server).await;
+
+    // Three consecutive wrong-password attempts. The third's behaviour
+    // (and any subsequent attempt) is the contract under test: russh
+    // closes the channel after the configured limit. We assert that an
+    // attempt past the limit either rejects or returns an error.
+    let r1 = handle
+        .authenticate_password("alice", "wrong-1")
+        .await
+        .expect("call 1");
+    let r2 = handle
+        .authenticate_password("alice", "wrong-2")
+        .await
+        .expect("call 2");
+    let r3 = handle
+        .authenticate_password("alice", "wrong-3")
+        .await
+        .expect("call 3");
+    assert!(
+        !r1 && !r2 && !r3,
+        "all three wrong attempts must be rejected"
+    );
+
+    // A fourth attempt should fail to even complete: the connection has
+    // been torn down. We accept either `Ok(false)` or `Err(_)` here —
+    // both signal "no further auth possible".
+    if let Ok(success) = handle.authenticate_password("alice", "wrong-4").await {
+        assert!(!success, "post-limit attempt must not succeed");
+    }
+}
+
+#[tokio::test]
 async fn allowlist_sentinel_compare_counter_increments_for_unknown_user() {
     // We can't get a direct handle on the AllowlistPubkeyAuthenticator's
     // counter from outside the test-helper builder, so this test

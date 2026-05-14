@@ -279,13 +279,21 @@ impl Handler for ConnectionHandler {
         let is_cert = key_type.contains("-cert-v01@openssh.com");
 
         if is_cert {
-            // v1 cert-via-russh wiring is deferred (russh's Handler trait
-            // does not surface the raw cert blob alongside the typed key).
+            // Cert auth via russh's wire protocol is deferred: russh-keys
+            // 0.45's `PublicKey` enum has only Ed25519 / RSA / EC variants
+            // (no `Certificate` variant), and `PublicKey::parse` does not
+            // recognise the `*-cert-v01@openssh.com` algorithm tags. The
+            // cert blob never reaches our handler.
+            //
+            // The `CaTrustCertAuthenticator` is fully validated in
+            // isolation (14 tests in `tests/cert.rs`). When russh exposes
+            // a cert-aware hook (or we wrap russh ourselves), the cert
+            // path is a small change here.
             tracing::warn!(
                 target: "esesaetsch_core::server",
                 user,
                 key_type,
-                reason = "cert_auth_via_russh_not_yet_wired",
+                reason = "cert_auth_via_russh_not_supported_in_0_45",
                 "auth rejected",
             );
             return Ok(self.uniform_reject());
