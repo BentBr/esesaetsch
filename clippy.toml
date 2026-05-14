@@ -1,0 +1,3 @@
+# Project-wide clippy config. Lint levels are set in workspace Cargo.toml.
+avoid-breaking-exported-api = false
+msrv = "1.85"

@@ -1,0 +1,6 @@
+[toolchain]
+# Use the currently-installed nightly. Pin to a specific date once the
+# project has stabilised and we want fully reproducible CI.
+channel = "nightly"
+components = ["rustfmt", "clippy", "rust-src", "llvm-tools-preview"]
+profile = "minimal"

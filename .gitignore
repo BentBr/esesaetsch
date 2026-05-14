@@ -1,0 +1,16 @@
+.idea
+.claude
+docs/superpowers
+target
+
+# Rust
+**/*.rs.bk
+
+# Coverage
+/coverage
+/lcov.info
+*.profraw
+
+# OS / IDE
+.DS_Store
+.vscode/

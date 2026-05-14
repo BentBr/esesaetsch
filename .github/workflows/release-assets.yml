@@ -1,0 +1,102 @@
+name: release-assets
+
+# Triggered when release-please creates a GitHub Release after the
+# release PR is merged. Builds cross-target binaries and uploads them
+# as release assets. The user-facing executable filename is
+# `esesätsch` (the Cargo package name `esesaetsch` is renamed during
+# the package step).
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+# Security: github.event.release.tag_name is the only event-derived value
+# used. It is bound to an env var and passed as a positional argument to
+# `gh release upload`, never interpolated into a shell command string.
+
+jobs:
+  build-and-upload:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runs-on: ubuntu-latest
+            archive-ext: tar.gz
+            bin-ext: ""
+            cross-linker: ""
+          - target: aarch64-unknown-linux-gnu
+            runs-on: ubuntu-latest
+            archive-ext: tar.gz
+            bin-ext: ""
+            cross-linker: gcc-aarch64-linux-gnu
+          - target: aarch64-apple-darwin
+            runs-on: macos-latest
+            archive-ext: tar.gz
+            bin-ext: ""
+            cross-linker: ""
+          - target: x86_64-pc-windows-msvc
+            runs-on: windows-latest
+            archive-ext: zip
+            bin-ext: .exe
+            cross-linker: ""
+          - target: aarch64-pc-windows-msvc
+            runs-on: windows-latest
+            archive-ext: zip
+            bin-ext: .exe
+            cross-linker: ""
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install cross linker (if needed)
+        if: matrix.cross-linker != ''
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.cross-linker }}
+
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package (unix)
+        if: matrix.archive-ext == 'tar.gz'
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euxo pipefail
+          STAGE="esesätsch-${TAG}-${TARGET}"
+          mkdir -p "$STAGE"
+          cp "target/${TARGET}/release/esesaetsch" "$STAGE/esesätsch"
+          cp LICENSE NOTICE README.md "$STAGE/"
+          tar -czf "${STAGE}.tar.gz" "$STAGE"
+          echo "ASSET=${STAGE}.tar.gz" >> "$GITHUB_ENV"
+
+      - name: Package (windows)
+        if: matrix.archive-ext == 'zip'
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          TARGET: ${{ matrix.target }}
+        shell: pwsh
+        run: |
+          $stage = "esesätsch-${env:TAG}-${env:TARGET}"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item "target/${env:TARGET}/release/esesaetsch.exe" "$stage/esesätsch.exe"
+          Copy-Item LICENSE,NOTICE,README.md $stage
+          Compress-Archive -Path $stage -DestinationPath "$stage.zip"
+          "ASSET=$stage.zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Upload release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" "$ASSET" --clobber
+        shell: bash
