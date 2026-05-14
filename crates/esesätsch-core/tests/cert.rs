@@ -1,8 +1,6 @@
 //! Integration tests for OpenSSH cert authentication (spec §6.1 cert path,
 //! §6.4 cert hygiene, §11.1 cert scenarios).
 
-#![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
-
 mod common;
 
 use std::sync::Arc;
@@ -12,16 +10,12 @@ use esesaetsch_core::cert::{CaTrustCertAuthenticator, CertAuthenticator, ParsedC
 use esesaetsch_core::error::AuthError;
 use ssh_key::certificate::CertType;
 
-use common::{
-    CertSpec, build_cert_bytes, pubkey_openssh_line, random_ed25519_key,
-};
+use common::{CertSpec, build_cert_bytes, pubkey_openssh_line, random_ed25519_key};
 
 /// Build a `CaTrustCertAuthenticator` that trusts `ca_key` and has the given
 /// revocation list. Uses real wall-clock time.
-fn auth_trusting(
-    ca_key: &ssh_key::PrivateKey,
-    revoked: &[u64],
-) -> CaTrustCertAuthenticator {
+#[allow(clippy::expect_used)] // test helper
+fn auth_trusting(ca_key: &ssh_key::PrivateKey, revoked: &[u64]) -> CaTrustCertAuthenticator {
     let ca_line = pubkey_openssh_line(ca_key, "test-ca");
     CaTrustCertAuthenticator::new(&[ca_line], revoked).expect("constructs")
 }
@@ -43,7 +37,9 @@ fn happy_path_cert_validates() {
     let user = random_ed25519_key();
     let bytes = build_cert_bytes(&CertSpec::happy_path(&user, &ca));
     let cert = ParsedCert::parse(&bytes).expect("parse");
-    let grants = auth_trusting(&ca, &[]).verify("alice", &cert).expect("validates");
+    let grants = auth_trusting(&ca, &[])
+        .verify("alice", &cert)
+        .expect("validates");
     assert!(grants.force_command.is_none());
 }
 
@@ -57,7 +53,10 @@ fn cert_signed_by_untrusted_ca_rejects_and_runs_dummy_work() {
     let bytes = build_cert_bytes(&CertSpec::happy_path(&user, &imposter_ca));
     let cert = ParsedCert::parse(&bytes).expect("parse");
     let auth = auth_trusting(&real_ca, &[]);
-    assert_eq!(auth.verify("alice", &cert), Err(AuthError::CredentialMismatch));
+    assert_eq!(
+        auth.verify("alice", &cert),
+        Err(AuthError::CredentialMismatch)
+    );
     assert_eq!(auth.dummy_work_count(), 1);
 }
 
@@ -75,7 +74,10 @@ fn expired_cert_rejects_and_runs_dummy_work() {
     let bytes = build_cert_bytes(&spec);
     let cert = ParsedCert::parse(&bytes).expect("parse");
     let auth = auth_trusting_at(&ca, &[], 10_000); // "now" past valid_before
-    assert_eq!(auth.verify("alice", &cert), Err(AuthError::CredentialMismatch));
+    assert_eq!(
+        auth.verify("alice", &cert),
+        Err(AuthError::CredentialMismatch)
+    );
     assert_eq!(auth.dummy_work_count(), 1);
 }
 
@@ -90,7 +92,10 @@ fn not_yet_valid_cert_rejects() {
     let bytes = build_cert_bytes(&spec);
     let cert = ParsedCert::parse(&bytes).expect("parse");
     let auth = auth_trusting_at(&ca, &[], 1_000);
-    assert_eq!(auth.verify("alice", &cert), Err(AuthError::CredentialMismatch));
+    assert_eq!(
+        auth.verify("alice", &cert),
+        Err(AuthError::CredentialMismatch)
+    );
     assert_eq!(auth.dummy_work_count(), 1);
 }
 
@@ -103,7 +108,10 @@ fn wrong_principal_rejects() {
     let bytes = build_cert_bytes(&spec);
     let cert = ParsedCert::parse(&bytes).expect("parse");
     let auth = auth_trusting(&ca, &[]);
-    assert_eq!(auth.verify("mallory", &cert), Err(AuthError::CredentialMismatch));
+    assert_eq!(
+        auth.verify("mallory", &cert),
+        Err(AuthError::CredentialMismatch)
+    );
     assert_eq!(auth.dummy_work_count(), 1);
 }
 
@@ -116,7 +124,10 @@ fn revoked_serial_rejects() {
     let bytes = build_cert_bytes(&spec);
     let cert = ParsedCert::parse(&bytes).expect("parse");
     let auth = auth_trusting(&ca, &[42]);
-    assert_eq!(auth.verify("alice", &cert), Err(AuthError::CredentialMismatch));
+    assert_eq!(
+        auth.verify("alice", &cert),
+        Err(AuthError::CredentialMismatch)
+    );
     assert_eq!(auth.dummy_work_count(), 1);
 }
 
@@ -131,7 +142,10 @@ fn host_cert_rejects() {
     let bytes = build_cert_bytes(&spec);
     let cert = ParsedCert::parse(&bytes).expect("parse");
     let auth = auth_trusting(&ca, &[]);
-    assert_eq!(auth.verify("alice", &cert), Err(AuthError::CredentialMismatch));
+    assert_eq!(
+        auth.verify("alice", &cert),
+        Err(AuthError::CredentialMismatch)
+    );
     assert_eq!(auth.dummy_work_count(), 1);
 }
 
@@ -144,7 +158,10 @@ fn unknown_critical_option_rejects() {
     let bytes = build_cert_bytes(&spec);
     let cert = ParsedCert::parse(&bytes).expect("parse");
     let auth = auth_trusting(&ca, &[]);
-    assert_eq!(auth.verify("alice", &cert), Err(AuthError::CredentialMismatch));
+    assert_eq!(
+        auth.verify("alice", &cert),
+        Err(AuthError::CredentialMismatch)
+    );
     assert_eq!(auth.dummy_work_count(), 1);
 }
 
@@ -153,12 +170,18 @@ fn force_command_critical_option_populates_grants() {
     let ca = random_ed25519_key();
     let user = random_ed25519_key();
     let mut spec = CertSpec::happy_path(&user, &ca);
-    spec.critical_options = vec![("force-command".to_owned(), "/usr/bin/echo locked".to_owned())];
+    spec.critical_options = vec![(
+        "force-command".to_owned(),
+        "/usr/bin/echo locked".to_owned(),
+    )];
     let bytes = build_cert_bytes(&spec);
     let cert = ParsedCert::parse(&bytes).expect("parse");
     let auth = auth_trusting(&ca, &[]);
     let grants = auth.verify("alice", &cert).expect("validates");
-    assert_eq!(grants.force_command.as_deref(), Some("/usr/bin/echo locked"));
+    assert_eq!(
+        grants.force_command.as_deref(),
+        Some("/usr/bin/echo locked")
+    );
 }
 
 #[test]

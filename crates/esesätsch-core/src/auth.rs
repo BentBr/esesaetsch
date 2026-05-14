@@ -86,21 +86,16 @@ impl AllowlistPubkeyAuthenticator {
     /// Returns `AuthError::Backend` if any allowlist entry fails to parse.
     /// (Config-time validation in `Config::validate` already catches this,
     /// but we re-check defensively here.)
-    pub fn from_allowlist(
-        allowlist: &BTreeMap<String, Vec<String>>,
-    ) -> Result<Self, AuthError> {
+    pub fn from_allowlist(allowlist: &BTreeMap<String, Vec<String>>) -> Result<Self, AuthError> {
         let mut keys: BTreeMap<String, Vec<Vec<u8>>> = BTreeMap::new();
         for (user, lines) in allowlist {
             let mut decoded = Vec::with_capacity(lines.len());
             for line in lines {
                 let b64 = line.split_whitespace().nth(1).ok_or_else(|| {
-                    AuthError::Backend(format!(
-                        "allowlist entry for {user} missing base64 blob",
-                    ))
+                    AuthError::Backend(format!("allowlist entry for {user} missing base64 blob"))
                 })?;
-                let parsed = russh_keys::parse_public_key_base64(b64).map_err(|e| {
-                    AuthError::Backend(format!("decoding key for {user}: {e}"))
-                })?;
+                let parsed = russh_keys::parse_public_key_base64(b64)
+                    .map_err(|e| AuthError::Backend(format!("decoding key for {user}: {e}")))?;
                 decoded.push(parsed.public_key_bytes());
             }
             keys.insert(user.clone(), decoded);

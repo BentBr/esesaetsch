@@ -3,8 +3,6 @@
 //! 2. The redaction helper replaces sensitive substrings before any log
 //!    record could be emitted (so even TRACE-level packet dumps are safe).
 
-#![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
-
 use esesaetsch_core::logging::{Verbosity, redact_sensitive};
 
 #[test]

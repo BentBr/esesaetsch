@@ -1,7 +1,5 @@
 //! Validation rules from spec §5.4. Each test is a single rule.
 
-#![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
-
 use esesaetsch_core::config::Config;
 use esesaetsch_core::error::ConfigError;
 use std::path::PathBuf;

@@ -1,17 +1,18 @@
 //! Integration tests for the auth trait surfaces (spec §6.3, §6.4).
 
-#![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
-
 mod common;
 
 use std::collections::BTreeMap;
 
-use esesaetsch_core::auth::{AllowlistPubkeyAuthenticator, PasswordAuthenticator, PubkeyAuthenticator};
+use esesaetsch_core::auth::{
+    AllowlistPubkeyAuthenticator, PasswordAuthenticator, PubkeyAuthenticator,
+};
 use esesaetsch_core::error::AuthError;
 use russh_keys::PublicKeyBase64;
 
 use common::{ED25519_FIXTURE, MockPasswordAuthenticator, pubkey_blob};
 
+#[allow(clippy::expect_used)] // test helper: panic on setup failure is fine
 fn allowlist_with_alice() -> AllowlistPubkeyAuthenticator {
     let mut map = BTreeMap::new();
     map.insert("alice".to_owned(), vec![ED25519_FIXTURE.to_owned()]);
@@ -70,7 +71,11 @@ fn pubkey_allowlist_supports_multiple_keys_per_user() {
     // verify either matches.
     let key2 = russh_keys::key::KeyPair::generate_ed25519().unwrap();
     let key2_pub = key2.clone_public_key().unwrap();
-    let key2_line = format!("{} {} test-key-2", key2_pub.name(), key2_pub.public_key_base64());
+    let key2_line = format!(
+        "{} {} test-key-2",
+        key2_pub.name(),
+        key2_pub.public_key_base64()
+    );
 
     let mut map = BTreeMap::new();
     map.insert(
@@ -98,7 +103,11 @@ fn password_mock_rejects_wrong_password_without_dummy_work() {
     let auth = MockPasswordAuthenticator::new().with_verdict("alice", "secret", Ok(()));
     let outcome = auth.verify("alice", "wrong");
     assert_eq!(outcome, Err(AuthError::CredentialMismatch));
-    assert_eq!(auth.dummy_work_count(), 0, "known-user path must not run dummy work");
+    assert_eq!(
+        auth.dummy_work_count(),
+        0,
+        "known-user path must not run dummy work"
+    );
 }
 
 #[test]
@@ -106,5 +115,9 @@ fn password_mock_unknown_user_runs_dummy_work() {
     let auth = MockPasswordAuthenticator::new().with_verdict("alice", "secret", Ok(()));
     let outcome = auth.verify("mallory", "anything");
     assert_eq!(outcome, Err(AuthError::UnknownUser));
-    assert_eq!(auth.dummy_work_count(), 1, "unknown-user path must run dummy work once");
+    assert_eq!(
+        auth.dummy_work_count(),
+        1,
+        "unknown-user path must run dummy work once"
+    );
 }

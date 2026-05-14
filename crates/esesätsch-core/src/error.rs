@@ -115,6 +115,29 @@ pub enum AuthError {
     Backend(String),
 }
 
+/// Errors arising from spawning a child process / PTY.
+///
+/// Operator-only. Per spec §6.4 rule 6, the client only sees
+/// `exit-status = 1` and a closed channel — no detail.
+#[derive(Debug, Error)]
+pub enum SpawnError {
+    /// The target OS user does not exist.
+    #[error("user `{0}` not found on this system")]
+    UserNotFound(String),
+    /// Insufficient privilege to switch to the target user.
+    #[error("insufficient privilege to spawn as user `{0}`")]
+    PrivilegeDenied(String),
+    /// PTY allocation failed.
+    #[error("PTY allocation failed: {0}")]
+    PtyAllocation(String),
+    /// `fork`/`CreateProcessAsUser`/`execve` failed.
+    #[error("process spawn failed: {0}")]
+    ProcessSpawn(String),
+    /// Underlying I/O failure.
+    #[error("io: {0}")]
+    Io(#[from] std::io::Error),
+}
+
 /// Errors arising from the crypto allowlist module.
 #[derive(Debug, Error)]
 pub enum CryptoError {

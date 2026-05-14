@@ -1,7 +1,5 @@
 //! End-to-end CLI tests via the compiled binary.
 
-#![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
-
 use assert_cmd::Command;
 use predicates::prelude::*;
 

@@ -1,7 +1,5 @@
 //! `hostkey::load_or_generate` — used by the `serve` subcommand on startup.
 
-#![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
-
 use esesaetsch_core::hostkey;
 
 #[test]

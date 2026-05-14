@@ -13,5 +13,8 @@ pub mod crypto;
 pub mod error;
 pub mod hostkey;
 pub mod logging;
+pub mod pty;
+pub mod server;
+pub mod session;
 
 pub use error::Error;

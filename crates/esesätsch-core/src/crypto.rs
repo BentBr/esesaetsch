@@ -12,10 +12,7 @@
 ///
 /// TODO(russh-0.45): re-add `sntrup761x25519-sha512@openssh.com` (post-quantum
 /// hybrid) when russh exposes it. v1 ships classical curve25519 KEX only.
-pub const KEX_ALGORITHMS: &[&str] = &[
-    "curve25519-sha256",
-    "curve25519-sha256@libssh.org",
-];
+pub const KEX_ALGORITHMS: &[&str] = &["curve25519-sha256", "curve25519-sha256@libssh.org"];
 
 /// Allowed host-key algorithms.
 pub const HOST_KEY_ALGORITHMS: &[&str] = &["ssh-ed25519", "rsa-sha2-512"];
@@ -23,10 +20,7 @@ pub const HOST_KEY_ALGORITHMS: &[&str] = &["ssh-ed25519", "rsa-sha2-512"];
 /// Allowed symmetric ciphers.
 ///
 /// TODO(russh-0.45): re-add `aes128-gcm@openssh.com` when russh exposes it.
-pub const CIPHERS: &[&str] = &[
-    "chacha20-poly1305@openssh.com",
-    "aes256-gcm@openssh.com",
-];
+pub const CIPHERS: &[&str] = &["chacha20-poly1305@openssh.com", "aes256-gcm@openssh.com"];
 
 /// Allowed MAC algorithms.
 pub const MACS: &[&str] = &[
@@ -50,22 +44,10 @@ pub const fn preferences() -> russh::Preferred {
     use std::borrow::Cow;
 
     russh::Preferred {
-        kex: Cow::Borrowed(&[
-            russh::kex::CURVE25519,
-            russh::kex::CURVE25519_PRE_RFC_8731,
-        ]),
+        kex: Cow::Borrowed(&[russh::kex::CURVE25519, russh::kex::CURVE25519_PRE_RFC_8731]),
         key: Cow::Borrowed(&[russh_keys::key::ED25519, russh_keys::key::RSA_SHA2_512]),
-        cipher: Cow::Borrowed(&[
-            russh::cipher::CHACHA20_POLY1305,
-            russh::cipher::AES_256_GCM,
-        ]),
-        mac: Cow::Borrowed(&[
-            russh::mac::HMAC_SHA512_ETM,
-            russh::mac::HMAC_SHA256_ETM,
-        ]),
-        compression: Cow::Borrowed(&[
-            russh::compression::NONE,
-            russh::compression::ZLIB_LEGACY,
-        ]),
+        cipher: Cow::Borrowed(&[russh::cipher::CHACHA20_POLY1305, russh::cipher::AES_256_GCM]),
+        mac: Cow::Borrowed(&[russh::mac::HMAC_SHA512_ETM, russh::mac::HMAC_SHA256_ETM]),
+        compression: Cow::Borrowed(&[russh::compression::NONE, russh::compression::ZLIB_LEGACY]),
     }
 }

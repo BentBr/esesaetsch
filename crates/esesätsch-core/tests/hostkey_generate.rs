@@ -1,8 +1,6 @@
 //! Tests for `hostkey::generate` — writes a fresh Ed25519 key to disk
 //! with restrictive permissions (0600 on Unix).
 
-#![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
-
 use esesaetsch_core::hostkey;
 use std::fs;
 

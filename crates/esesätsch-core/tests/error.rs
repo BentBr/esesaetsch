@@ -2,8 +2,6 @@
 //! and that their `Display` output is non-empty (never accidentally leaks
 //! internal Debug output to operators).
 
-#![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
-
 use esesaetsch_core::error::{ConfigError, CryptoError, Error, HostKeyError};
 
 const fn assert_send_sync_static<T: Send + Sync + 'static>() {}

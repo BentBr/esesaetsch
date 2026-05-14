@@ -11,6 +11,7 @@ description = "Core library for the esesätsch SSH server (protocol, auth, confi
 workspace = true
 
 [dependencies]
+async-trait = "0.1"
 tokio       = { workspace = true }
 tracing     = { workspace = true }
 tracing-subscriber = { workspace = true }

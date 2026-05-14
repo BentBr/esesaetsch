@@ -1,8 +1,6 @@
 //! Tests for `hostkey::load` — reads an existing PEM-encoded Ed25519 key
 //! from disk and returns the parsed `russh_keys::key::KeyPair`.
 
-#![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
-
 use esesaetsch_core::error::HostKeyError;
 use esesaetsch_core::hostkey;
 use std::io::Write;

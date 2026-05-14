@@ -1,3 +1,11 @@
 # Project-wide clippy config. Lint levels are set in workspace Cargo.toml.
 avoid-breaking-exported-api = false
 msrv = "1.85"
+
+# In test code (any fn marked `#[test]` or anything inside a `#[cfg(test)]`
+# module), allow `.unwrap()`, `.expect()`, and `panic!()`. These are
+# idiomatic for tests; banning them workspace-wide would force ugly
+# `let-else`/`?` boilerplate without making tests any safer.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true

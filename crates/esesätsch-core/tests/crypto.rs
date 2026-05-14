@@ -2,8 +2,6 @@
 //! Any change to the policy is a code change in `crypto.rs` and must
 //! flow through these tests.
 
-#![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
-
 use esesaetsch_core::crypto::{CIPHERS, COMPRESSION, HOST_KEY_ALGORITHMS, KEX_ALGORITHMS, MACS};
 
 #[test]

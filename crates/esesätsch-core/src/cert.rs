@@ -51,8 +51,8 @@ impl ParsedCert {
     ///
     /// `CertError::Malformed` if the blob fails to parse.
     pub fn parse(blob: &[u8]) -> Result<Self, CertError> {
-        let inner = Certificate::from_bytes(blob)
-            .map_err(|e| CertError::Malformed(format!("{e}")))?;
+        let inner =
+            Certificate::from_bytes(blob).map_err(|e| CertError::Malformed(format!("{e}")))?;
         Ok(Self { inner })
     }
 

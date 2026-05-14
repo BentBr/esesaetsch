@@ -3,8 +3,6 @@
 //! When no config file and no CLI overrides are provided, `Config::defaults()`
 //! returns the documented default values.
 
-#![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
-
 use esesaetsch_core::config::Config;
 use std::net::SocketAddr;
 use std::path::PathBuf;

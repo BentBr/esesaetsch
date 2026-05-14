@@ -1,8 +1,6 @@
 //! Top-level surface tests: the public types exist with the expected fields
 //! and the TOML examples from spec §5.3 parse without error.
 
-#![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
-
 use esesaetsch_core::config::{AuthConfig, CaConfig, LoggingConfig, ServerConfig, TomlConfig};
 
 #[test]

@@ -2,11 +2,10 @@
 //!
 //! Each test covers one merge precedence rule.
 
-#![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
-
 use esesaetsch_core::config::{Cli, Config, TomlConfig};
 use std::path::PathBuf;
 
+#[allow(clippy::expect_used)] // test helper
 fn parse(raw: &str) -> TomlConfig {
     toml::from_str(raw).expect("test toml parses")
 }

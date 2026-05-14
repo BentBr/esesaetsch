@@ -1,10 +1,16 @@
 //! Shared test helpers — mock implementations of the core's traits, plus
 //! small fixtures. Included by integration tests via `mod common;`.
 //!
-//! The `#![allow]` at the top of each integration test file covers the
-//! `unwrap_used`/`expect_used` lints; this module relies on that.
-
-#![allow(dead_code, clippy::expect_used, clippy::unwrap_used, clippy::panic)]
+//! Each test file includes this module via `mod common;` — different files
+//! may use different subsets of the helpers, so individual items will look
+//! "dead" from any one file's perspective (`dead_code`).
+//!
+//! The helpers panic via `.expect`/`.unwrap` on setup failure: that's the
+//! contract here, identical to what clippy's own `allow-expect-in-tests`
+//! does for `#[test]` fns, just reachable from non-`#[test]` helpers. Two
+//! lints are allowed at module scope rather than sprinkled across every
+//! helper.
+#![allow(dead_code, clippy::expect_used, clippy::unwrap_used)]
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -28,7 +34,8 @@ pub struct MockPasswordAuthenticator {
 impl MockPasswordAuthenticator {
     /// Empty mock — every call returns `AuthError::UnknownUser`.
     #[must_use]
-    pub fn new() -> Self {  // not const: BTreeMap::new is const but Arc::new is not
+    pub fn new() -> Self {
+        // not const: BTreeMap::new is const but Arc::new is not
         Self {
             verdicts: BTreeMap::new(),
             dummy_work_count: Arc::new(AtomicU64::new(0)),
@@ -124,12 +131,14 @@ impl Default for MockPubkeyAuthenticator {
 
 impl PubkeyAuthenticator for MockPubkeyAuthenticator {
     fn verify(&self, user: &str, key_blob: &[u8]) -> Result<(), AuthError> {
-        self.verdicts.get(user).map_or(Err(AuthError::UnknownUser), |blobs| {
-            blobs
-                .get(key_blob)
-                .cloned()
-                .unwrap_or(Err(AuthError::CredentialMismatch))
-        })
+        self.verdicts
+            .get(user)
+            .map_or(Err(AuthError::UnknownUser), |blobs| {
+                blobs
+                    .get(key_blob)
+                    .cloned()
+                    .unwrap_or(Err(AuthError::CredentialMismatch))
+            })
     }
 }
 
@@ -143,7 +152,10 @@ pub const ED25519_FIXTURE: &str =
 #[must_use]
 pub fn pubkey_blob(openssh_line: &str) -> Vec<u8> {
     use russh_keys::PublicKeyBase64;
-    let b64 = openssh_line.split_whitespace().nth(1).expect("openssh line has b64 token");
+    let b64 = openssh_line
+        .split_whitespace()
+        .nth(1)
+        .expect("openssh line has b64 token");
     russh_keys::parse_public_key_base64(b64)
         .expect("test fixture parses")
         .public_key_bytes()
@@ -212,6 +224,135 @@ impl<'a> CertSpec<'a> {
             critical_options: Vec::new(),
         }
     }
+}
+
+// =====================================================================
+// TestServer harness — boots a real EsesätschServer on 127.0.0.1:0 and
+// exposes the bound port so integration tests can connect with russh's
+// client.
+// =====================================================================
+
+use std::net::SocketAddr;
+use std::sync::Arc as StdArc;
+
+use esesaetsch_core::auth::AllowlistPubkeyAuthenticator;
+use esesaetsch_core::config::Config;
+use esesaetsch_core::pty::{MockPtySpawner, PtySpawner};
+use esesaetsch_core::server::EsesätschServer;
+use russh::server::Server as _;
+use tokio::net::TcpListener;
+use tokio::task::JoinHandle;
+
+/// Running test server. Drop terminates the listener.
+pub struct TestServer {
+    pub bound_addr: SocketAddr,
+    handle: Option<JoinHandle<()>>,
+}
+
+impl TestServer {
+    /// Boot a test server. Uses a default empty `MockPtySpawner`; for
+    /// tests that need a scripted child, see [`Self::start_with_spawner`].
+    pub async fn start(
+        config: Config,
+        pubkey_auth: StdArc<dyn PubkeyAuthenticator>,
+        password_auth: StdArc<dyn PasswordAuthenticator>,
+    ) -> Self {
+        Self::start_with_spawner(
+            config,
+            pubkey_auth,
+            password_auth,
+            StdArc::new(MockPtySpawner::new()),
+        )
+        .await
+    }
+
+    /// Boot a test server with a caller-supplied PTY spawner. Useful when
+    /// the test needs to inspect what the spawner observed or to script
+    /// stdout/stderr/exit.
+    pub async fn start_with_spawner(
+        config: Config,
+        pubkey_auth: StdArc<dyn PubkeyAuthenticator>,
+        password_auth: StdArc<dyn PasswordAuthenticator>,
+        spawner: StdArc<dyn PtySpawner>,
+    ) -> Self {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await.expect("bind");
+        let bound_addr = listener.local_addr().expect("local_addr");
+
+        let host_key = russh_keys::key::KeyPair::generate_ed25519().expect("gen ed25519 host key");
+        let (mut server, russh_config) =
+            EsesätschServer::new(config, pubkey_auth, password_auth, None, spawner, host_key);
+
+        let handle = tokio::spawn(async move {
+            // run_on_socket loops until cancellation.
+            let _ = server.run_on_socket(russh_config, &listener).await;
+        });
+
+        Self {
+            bound_addr,
+            handle: Some(handle),
+        }
+    }
+
+    /// Convenience: a server with a single user `alice` whose pubkey is
+    /// the `ED25519_FIXTURE` and password is `"hunter2"`. Pubkey + password
+    /// both enabled.
+    pub async fn with_default_users() -> (Self, ssh_key::PrivateKey) {
+        // We need a USABLE key for the test client. Generate one and put
+        // its public side into the allowlist.
+        let user_key = random_ed25519_key();
+        let user_pub = user_key
+            .public_key()
+            .to_openssh()
+            .expect("public_to_openssh");
+
+        let mut config = Config::defaults();
+        config.pubkey_enabled = true;
+        config.password_enabled = true;
+        config.cert_enabled = false;
+        config
+            .authorized_keys
+            .insert("alice".to_owned(), vec![user_pub.clone()]);
+
+        let mut allow_map: std::collections::BTreeMap<String, Vec<String>> =
+            std::collections::BTreeMap::new();
+        allow_map.insert("alice".to_owned(), vec![user_pub]);
+        let pubkey_auth: StdArc<dyn PubkeyAuthenticator> =
+            StdArc::new(AllowlistPubkeyAuthenticator::from_allowlist(&allow_map).unwrap());
+
+        let password_auth: StdArc<dyn PasswordAuthenticator> =
+            StdArc::new(MockPasswordAuthenticator::new().with_verdict("alice", "hunter2", Ok(())));
+
+        let server = Self::start(config, pubkey_auth, password_auth).await;
+        (server, user_key)
+    }
+}
+
+impl Drop for TestServer {
+    fn drop(&mut self) {
+        if let Some(h) = self.handle.take() {
+            h.abort();
+        }
+    }
+}
+
+/// Permissive client-side handler that accepts any server host key.
+pub struct AcceptAnyClientHandler;
+
+#[async_trait::async_trait]
+impl russh::client::Handler for AcceptAnyClientHandler {
+    type Error = russh::Error;
+
+    async fn check_server_key(
+        &mut self,
+        _server_public_key: &russh_keys::key::PublicKey,
+    ) -> Result<bool, Self::Error> {
+        Ok(true)
+    }
+}
+
+/// Convenience: client-side russh `Config` with a 5-second connect timeout.
+pub fn client_config() -> StdArc<russh::client::Config> {
+    StdArc::new(russh::client::Config::default())
 }
 
 /// Build a signed OpenSSH user certificate from `spec` and return its
