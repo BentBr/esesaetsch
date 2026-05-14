@@ -14,3 +14,6 @@ target
 # OS / IDE
 .DS_Store
 .vscode/
+
+# local host key if created during build
+host_key
