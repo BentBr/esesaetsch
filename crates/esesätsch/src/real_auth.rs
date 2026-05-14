@@ -140,7 +140,7 @@ mod windows_impl {
                 PCWSTR(pass_w.as_ptr()),
                 LOGON32_LOGON_NETWORK,
                 LOGON32_PROVIDER_DEFAULT,
-                &mut token,
+                &raw mut token,
             )
         };
         match result {
