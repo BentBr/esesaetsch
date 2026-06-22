@@ -19,6 +19,11 @@ on:
         description: Existing release tag to attach assets to
         required: true
         type: string
+  pull_request:
+    paths:
+      - 'packaging/**'
+      - '.github/workflows/release-packages.yml'
+      - 'crates/esesätsch/src/main.rs'
 
 permissions:
   contents: write
@@ -186,7 +191,15 @@ jobs:
           cp LICENSE NOTICE README.md "$STAGE/"
           tar -czf "out/${STAGE}.tar.gz" "$STAGE"
 
+      - name: Upload package artifacts (for smoke tests)
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-packages-${{ matrix.pkg_arch }}
+          path: out/*
+          if-no-files-found: error
+
       - name: Upload to release
+        if: github.event_name != 'pull_request'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -239,6 +252,7 @@ jobs:
             "esesätsch-${VERSION}-universal-apple-darwin.pkg"
 
       - name: Upload to release
+        if: github.event_name != 'pull_request'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -281,11 +295,56 @@ jobs:
             packaging/windows/main.wxs \
             --output "esesaetsch-${TAG}-${{ matrix.label }}.msi"
       - name: Upload to release
+        if: github.event_name != 'pull_request'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ needs.resolve-tag.outputs.tag }}
         run: gh release upload "$TAG" "esesaetsch-${TAG}-${{ matrix.label }}.msi" --clobber
+
+  smoke-linux:
+    needs: package-linux
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: debian:stable
+            fmt: deb
+            install: dpkg -i /pkgs/*.deb || apt-get -y install -f
+            pre: apt-get update
+          - image: fedora:latest
+            fmt: rpm
+            install: dnf -y install /pkgs/*.rpm
+            pre: "true"
+          - image: archlinux:latest
+            fmt: pkg.tar.zst
+            install: pacman -U --noconfirm /pkgs/*.pkg.tar.zst
+            pre: pacman -Sy --noconfirm
+          - image: alpine:latest
+            fmt: apk
+            install: apk add --allow-untrusted /pkgs/*.apk
+            pre: "true"
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - name: Download amd64 packages
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-packages-amd64
+          path: /pkgs
+      - name: Install and verify
+        shell: sh
+        run: |
+          set -eux
+          ${{ matrix.pre }}
+          ${{ matrix.install }}
+          esesaetsch --version
+          test -f /usr/lib/systemd/system/esesaetsch.service
+          test -f /etc/esesaetsch/config.toml
+          test -f /usr/share/man/man1/esesaetsch.1.gz
+          # postinstall host-key generation ran (or is runnable):
+          esesaetsch gen-key --host-key /tmp/k && test -f /tmp/k
 
   checksums:
     needs: [package-linux, package-macos, package-windows, resolve-tag]
