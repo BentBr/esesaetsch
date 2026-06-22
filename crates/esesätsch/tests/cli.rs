@@ -141,3 +141,45 @@ fn serve_actually_listens_on_the_configured_port() {
 
     assert!(connected, "server did not start listening on port {port}");
 }
+
+#[test]
+fn completions_bash_emits_a_script() {
+    Command::cargo_bin("esesaetsch")
+        .unwrap()
+        .args(["completions", "bash"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("esesaetsch"))
+        .stdout(predicate::str::contains("complete"));
+}
+
+#[test]
+fn completions_supports_zsh_and_fish() {
+    for shell in ["zsh", "fish"] {
+        Command::cargo_bin("esesaetsch")
+            .unwrap()
+            .args(["completions", shell])
+            .assert()
+            .success();
+    }
+}
+
+#[test]
+fn completions_rejects_unknown_shell() {
+    Command::cargo_bin("esesaetsch")
+        .unwrap()
+        .args(["completions", "tcsh"])
+        .assert()
+        .failure();
+}
+
+#[test]
+fn man_emits_roff_with_the_program_name() {
+    Command::cargo_bin("esesaetsch")
+        .unwrap()
+        .arg("man")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(".TH"))
+        .stdout(predicate::str::contains("esesaetsch"));
+}
