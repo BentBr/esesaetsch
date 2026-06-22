@@ -179,7 +179,7 @@ jobs:
           TARGET: ${{ matrix.musl_target }}
         run: |
           set -euxo pipefail
-          STAGE="esesätsch-${VERSION}-${TARGET}-musl"
+          STAGE="esesätsch-${VERSION}-${TARGET}"
           mkdir -p "$STAGE"
           cp musl/esesaetsch "$STAGE/esesätsch"
           chmod +x "$STAGE/esesätsch"
@@ -224,7 +224,7 @@ jobs:
           chmod 755 "$ROOT/usr/local/bin/esesaetsch"
           cp packaging/macos/com.esesaetsch.server.plist "$ROOT/Library/LaunchDaemons/"
           cp packaging/config/esesaetsch.toml "$ROOT/etc/esesaetsch/config.toml"
-          ./esesaetsch-universal man > "$ROOT/usr/local/share/man/man1/esesaetsch.1"
+          ./esesaetsch-universal man | gzip -9 > "$ROOT/usr/local/share/man/man1/esesaetsch.1.gz"
 
           # Strip the leading 'v' from the tag for CFBundle-style version.
           PKGVER="${VERSION#v}"
@@ -301,5 +301,6 @@ jobs:
           set -euxo pipefail
           mkdir sums && cd sums
           gh release download "$TAG" --pattern '*' --skip-existing
+          rm -f SHA256SUMS
           sha256sum * > SHA256SUMS
           gh release upload "$TAG" SHA256SUMS --clobber
