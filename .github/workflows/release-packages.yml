@@ -261,11 +261,14 @@ jobs:
           TAG: ${{ needs.resolve-tag.outputs.tag }}
         run: |
           set -euxo pipefail
+          # NB: cargo-wix's positional arg is the Cargo.toml manifest, not the
+          # wxs. Pass the wxs via --include; -p selects the workspace member.
+          VER="${TAG#v}"; VER="${VER:-0.0.0}"
           cargo wix --no-build --nocapture \
             -p esesaetsch \
             --target ${{ matrix.target }} \
-            --install-version "${TAG#v}" \
-            packaging/windows/main.wxs \
+            --install-version "$VER" \
+            --include packaging/windows/main.wxs \
             --output "esesaetsch-${TAG}-${{ matrix.label }}.msi"
       - name: Upload to release
         if: github.event_name != 'pull_request'
