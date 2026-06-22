@@ -1,0 +1,56 @@
+name: esesaetsch
+arch: ${PKG_ARCH}
+version: ${VERSION}
+version_schema: none
+maintainer: Bent Brüggemann <noreply@github.com>
+description: A strict, cross-platform SSH server.
+homepage: https://github.com/BentBr/esesaetsch
+license: Apache-2.0
+section: net
+priority: optional
+
+depends: []
+
+overrides:
+  deb:
+    depends:
+      - libpam0g
+  rpm:
+    depends:
+      - pam
+  archlinux:
+    depends:
+      - pam
+  apk:
+    depends:
+      - linux-pam
+
+contents:
+  - src: ./dist/esesaetsch
+    dst: /usr/bin/esesaetsch
+    file_info:
+      mode: 0755
+  - src: ./packaging/systemd/esesaetsch.service
+    dst: /usr/lib/systemd/system/esesaetsch.service
+  - src: ./packaging/config/esesaetsch.toml
+    dst: /etc/esesaetsch/config.toml
+    type: "config|noreplace"
+  - src: ./dist/esesaetsch.1.gz
+    dst: /usr/share/man/man1/esesaetsch.1.gz
+  - src: ./dist/completions/esesaetsch.bash
+    dst: /usr/share/bash-completion/completions/esesaetsch
+  - src: ./dist/completions/_esesaetsch
+    dst: /usr/share/zsh/site-functions/_esesaetsch
+  - src: ./dist/completions/esesaetsch.fish
+    dst: /usr/share/fish/vendor_completions.d/esesaetsch.fish
+  - src: ./LICENSE
+    dst: /usr/share/doc/esesaetsch/LICENSE
+  - src: ./NOTICE
+    dst: /usr/share/doc/esesaetsch/NOTICE
+  - src: ./README.md
+    dst: /usr/share/doc/esesaetsch/README.md
+
+scripts:
+  postinstall: ./packaging/scripts/postinstall.sh
+  preremove: ./packaging/scripts/preremove.sh
+  postremove: ./packaging/scripts/postremove.sh
