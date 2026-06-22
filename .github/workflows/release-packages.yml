@@ -168,15 +168,19 @@ jobs:
           "$HOSTBIN" completions zsh  > dist/completions/_esesaetsch
           "$HOSTBIN" completions fish > dist/completions/esesaetsch.fish
 
-      - name: Build packages (deb/rpm/arch/apk)
+      - name: Build packages (deb/rpm/arch from gnu, apk from musl)
         shell: bash
         run: |
           set -euxo pipefail
           export PATH="$PATH:$(go env GOPATH)/bin"
           mkdir -p out
-          for fmt in deb rpm archlinux apk; do
+          # glibc distros: deb/rpm/archlinux use the gnu binary already staged in dist/.
+          for fmt in deb rpm archlinux; do
             nfpm package -f packaging/nfpm.yaml -p "$fmt" -t out/
           done
+          # Alpine is musl: rebuild the staged binary from the musl artifact for the apk.
+          cp musl/esesaetsch dist/esesaetsch
+          nfpm package -f packaging/nfpm.yaml -p apk -t out/
 
       - name: Build static musl tarball
         shell: bash
@@ -348,6 +352,7 @@ jobs:
 
   checksums:
     needs: [package-linux, package-macos, package-windows, resolve-tag]
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Download all release assets and checksum
