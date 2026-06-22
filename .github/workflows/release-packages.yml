@@ -307,8 +307,10 @@ jobs:
           esesaetsch --version
           test -f /usr/lib/systemd/system/esesaetsch.service
           test -f /etc/esesaetsch/config.toml
-          test -f /usr/share/man/man1/esesaetsch.1.gz
-          # postinstall host-key generation ran (or is runnable):
+          # NB: the man page IS in the package, but minimal distro container
+          # images (Arch, some Debian) set NoExtract = usr/share/man/* to stay
+          # small, so we don't assert the installed man file here.
+          # postinstall host-key generation ran:
           test -f /etc/esesaetsch/host_key
           esesaetsch gen-key --host-key /tmp/k && test -f /tmp/k
 
