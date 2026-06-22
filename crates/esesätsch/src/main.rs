@@ -24,7 +24,11 @@ use real_pty::RealPtySpawner;
 use russh::server::Server;
 
 #[derive(Parser, Debug)]
-#[command(name = "esesätsch", about = "A strict cross-platform SSH server.")]
+#[command(
+    name = "esesätsch",
+    version,
+    about = "A strict cross-platform SSH server."
+)]
 #[allow(clippy::struct_excessive_bools)] // independent CLI flags
 struct Args {
     #[command(subcommand)]

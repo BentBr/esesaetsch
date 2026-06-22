@@ -11,7 +11,7 @@ GitHub Release by `.github/workflows/release-packages.yml`.
 | Fedora/RHEL/SUSE | x86_64, aarch64 | `esesaetsch-<ver>.<arch>.rpm` |
 | Arch | x86_64, aarch64 | `esesaetsch-<ver>-<arch>.pkg.tar.zst` |
 | Alpine | x86_64, aarch64 | `esesaetsch_<ver>_<arch>.apk` |
-| Static musl | x86_64, aarch64 | `esesätsch-<ver>-<target>-musl.tar.gz` |
+| Static musl | x86_64, aarch64 | `esesätsch-<ver>-<target>.tar.gz` |
 | macOS (universal) | arm64+x86_64 | `esesätsch-<ver>-universal-apple-darwin.pkg` |
 | Windows | x86_64, aarch64 | `esesaetsch-<ver>-<x64\|arm64>.msi` |
 

@@ -2,7 +2,7 @@ name: esesaetsch
 arch: ${PKG_ARCH}
 version: ${VERSION}
 version_schema: none
-maintainer: Bent Brüggemann <noreply@github.com>
+maintainer: Bent Brüggemann <noreply@github.com>, Pierre Jochem <noreply@github.com>
 description: A strict, cross-platform SSH server.
 homepage: https://github.com/BentBr/esesaetsch
 license: Apache-2.0

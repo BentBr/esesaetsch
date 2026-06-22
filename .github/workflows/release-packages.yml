@@ -172,6 +172,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
+          export VERSION="${VERSION#v}"
           export PATH="$PATH:$(go env GOPATH)/bin"
           mkdir -p out
           # glibc distros: deb/rpm/archlinux use the gnu binary already staged in dist/.
@@ -212,6 +213,7 @@ jobs:
 
   package-macos:
     needs: [build, resolve-tag]
+    if: github.event_name != 'pull_request'
     runs-on: macos-latest
     env:
       VERSION: ${{ needs.resolve-tag.outputs.tag }}
@@ -265,6 +267,7 @@ jobs:
 
   package-windows:
     needs: [build, resolve-tag]
+    if: github.event_name != 'pull_request'
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -348,6 +351,7 @@ jobs:
           test -f /etc/esesaetsch/config.toml
           test -f /usr/share/man/man1/esesaetsch.1.gz
           # postinstall host-key generation ran (or is runnable):
+          test -f /etc/esesaetsch/host_key
           esesaetsch gen-key --host-key /tmp/k && test -f /tmp/k
 
   checksums:

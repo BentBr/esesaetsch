@@ -4,6 +4,15 @@ use assert_cmd::Command;
 use predicates::prelude::*;
 
 #[test]
+fn version_flag_succeeds() {
+    Command::cargo_bin("esesaetsch")
+        .unwrap()
+        .arg("--version")
+        .assert()
+        .success();
+}
+
+#[test]
 fn help_lists_subcommands() {
     Command::cargo_bin("esesaetsch")
         .unwrap()
@@ -155,13 +164,18 @@ fn completions_bash_emits_a_script() {
 
 #[test]
 fn completions_supports_zsh_and_fish() {
-    for shell in ["zsh", "fish"] {
-        Command::cargo_bin("esesaetsch")
-            .unwrap()
-            .args(["completions", shell])
-            .assert()
-            .success();
-    }
+    Command::cargo_bin("esesaetsch")
+        .unwrap()
+        .args(["completions", "zsh"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("_esesaetsch"));
+    Command::cargo_bin("esesaetsch")
+        .unwrap()
+        .args(["completions", "fish"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("esesaetsch"));
 }
 
 #[test]
