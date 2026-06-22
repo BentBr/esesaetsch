@@ -10,8 +10,6 @@ GitHub Release by `.github/workflows/release-packages.yml`.
 | Debian/Ubuntu | amd64, arm64 | `esesaetsch_<ver>_<arch>.deb` |
 | Fedora/RHEL/SUSE | x86_64, aarch64 | `esesaetsch-<ver>.<arch>.rpm` |
 | Arch | x86_64, aarch64 | `esesaetsch-<ver>-<arch>.pkg.tar.zst` |
-| Alpine | x86_64, aarch64 | `esesaetsch_<ver>_<arch>.apk` |
-| Static musl | x86_64, aarch64 | `esesätsch-<ver>-<target>.tar.gz` |
 | macOS (universal) | arm64+x86_64 | `esesätsch-<ver>-universal-apple-darwin.pkg` |
 | Windows | x86_64, aarch64 | `esesaetsch-<ver>-<x64\|arm64>.msi` |
 
@@ -32,7 +30,7 @@ The postinstall hook generates `/etc/esesaetsch/host_key` if absent. It does
 sudo systemctl enable --now esesaetsch.service
 ```
 
-Each package declares the libpam runtime dependency (`libpam0g`/`pam`/`linux-pam`).
+Each package declares the libpam runtime dependency (`libpam0g`/`pam`).
 
 ## Signing
 
@@ -58,9 +56,9 @@ VERSION=0.0.0-dev PKG_ARCH=amd64 nfpm package -f packaging/nfpm.yaml -p deb -t d
 dpkg-deb -c dist/esesaetsch_0.0.0-dev_amd64.deb   # inspect
 ```
 
-## Known caveat: PAM on musl
+## Not yet shipped: Alpine / static musl
 
-The Alpine `.apk` and static musl tarballs link libpam against musl. Pubkey
-and certificate auth are unaffected; the password (PAM) path is less
-battle-tested under musl. Smoke tests confirm install + run; verify password
-auth manually before relying on it in an Alpine/musl deployment.
+A static-musl build (and an Alpine `.apk`) is **not** produced yet. The binary
+links two C libraries — AWS-LC (crypto, via `russh`) and PAM — and a musl build
+needs a full musl C cross-toolchain plus musl builds of both. That is tracked as
+a follow-up; until then, Alpine users can run the glibc binary under `gcompat`.

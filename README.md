@@ -59,8 +59,8 @@ Grab the archive for your platform from the [latest release](https://github.com/
 Each archive contains the `esesätsch` binary plus `LICENSE`, `NOTICE`, and `README.md`.
 
 Prefer a native package? Each release also ships `.deb`, `.rpm`, Arch
-`.pkg.tar.zst`, Alpine `.apk`, a macOS `.pkg`, and a Windows `.msi` for
-amd64 and arm64. See [`packaging/README.md`](packaging/README.md).
+`.pkg.tar.zst`, a macOS `.pkg`, and a Windows `.msi` for amd64 and arm64.
+See [`packaging/README.md`](packaging/README.md).
 
 ### 2. Extract and put it on your `$PATH`
 

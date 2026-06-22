@@ -45,12 +45,6 @@ jobs:
           - target: aarch64-unknown-linux-gnu
             runs-on: ubuntu-latest
             install: linux-arm
-          - target: x86_64-unknown-linux-musl
-            runs-on: ubuntu-latest
-            install: linux-musl
-          - target: aarch64-unknown-linux-musl
-            runs-on: ubuntu-latest
-            install: linux-musl-arm
           - target: aarch64-apple-darwin
             runs-on: macos-latest
             install: macos
@@ -78,14 +72,6 @@ jobs:
         if: matrix.install == 'linux-arm'
         run: ./.github/scripts/install-linux-arm-deps.sh
 
-      - name: Install build deps (Linux musl)
-        if: startsWith(matrix.install, 'linux-musl')
-        run: sudo apt-get update && sudo apt-get install -y musl-tools libclang-dev
-
-      - name: Install arm64 musl cross linker
-        if: matrix.install == 'linux-musl-arm'
-        run: sudo apt-get install -y gcc-aarch64-linux-gnu
-
       - name: Install build deps (macOS)
         if: matrix.install == 'macos'
         run: brew install llvm
@@ -96,7 +82,6 @@ jobs:
           PKG_CONFIG_ALLOW_CROSS: ${{ contains(matrix.install, 'arm') && '1' || '' }}
           LIBCLANG_PATH: ${{ matrix.install == 'macos' && '/opt/homebrew/opt/llvm/lib' || '' }}
           DYLD_FALLBACK_LIBRARY_PATH: ${{ matrix.install == 'macos' && '/opt/homebrew/opt/llvm/lib' || '' }}
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: aarch64-linux-gnu-gcc
         run: cargo build --release --target ${{ matrix.target }} -p esesaetsch
 
       - name: Upload binary artifact
@@ -129,10 +114,8 @@ jobs:
         include:
           - pkg_arch: amd64
             gnu_target: x86_64-unknown-linux-gnu
-            musl_target: x86_64-unknown-linux-musl
           - pkg_arch: arm64
             gnu_target: aarch64-unknown-linux-gnu
-            musl_target: aarch64-unknown-linux-musl
     env:
       VERSION: ${{ needs.resolve-tag.outputs.tag }}
       PKG_ARCH: ${{ matrix.pkg_arch }}
@@ -146,11 +129,6 @@ jobs:
         with:
           name: bin-${{ matrix.gnu_target }}
           path: gnu
-      - name: Download musl binary
-        uses: actions/download-artifact@v4
-        with:
-          name: bin-${{ matrix.musl_target }}
-          path: musl
 
       - name: Stage nfpm inputs
         shell: bash
@@ -168,7 +146,7 @@ jobs:
           "$HOSTBIN" completions zsh  > dist/completions/_esesaetsch
           "$HOSTBIN" completions fish > dist/completions/esesaetsch.fish
 
-      - name: Build packages (deb/rpm/arch from gnu, apk from musl)
+      - name: Build packages (deb/rpm/arch)
         shell: bash
         run: |
           set -euxo pipefail
@@ -179,22 +157,6 @@ jobs:
           for fmt in deb rpm archlinux; do
             nfpm package -f packaging/nfpm.yaml -p "$fmt" -t out/
           done
-          # Alpine is musl: rebuild the staged binary from the musl artifact for the apk.
-          cp musl/esesaetsch dist/esesaetsch
-          nfpm package -f packaging/nfpm.yaml -p apk -t out/
-
-      - name: Build static musl tarball
-        shell: bash
-        env:
-          TARGET: ${{ matrix.musl_target }}
-        run: |
-          set -euxo pipefail
-          STAGE="esesätsch-${VERSION}-${TARGET}"
-          mkdir -p "$STAGE"
-          cp musl/esesaetsch "$STAGE/esesätsch"
-          chmod +x "$STAGE/esesätsch"
-          cp LICENSE NOTICE README.md "$STAGE/"
-          tar -czf "out/${STAGE}.tar.gz" "$STAGE"
 
       - name: Upload package artifacts (for smoke tests)
         uses: actions/upload-artifact@v4
@@ -328,10 +290,6 @@ jobs:
             fmt: pkg.tar.zst
             install: pacman -U --noconfirm /pkgs/*.pkg.tar.zst
             pre: pacman -Sy --noconfirm
-          - image: alpine:latest
-            fmt: apk
-            install: apk add --allow-untrusted /pkgs/*.apk
-            pre: "true"
     container:
       image: ${{ matrix.image }}
     steps:

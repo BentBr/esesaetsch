@@ -21,9 +21,6 @@ overrides:
   archlinux:
     depends:
       - pam
-  apk:
-    depends:
-      - linux-pam
 
 contents:
   - src: ./dist/esesaetsch
