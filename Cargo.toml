@@ -48,7 +48,6 @@ russh       = "0.60"
 # use for host-key generation, and its `Certificate::builder` powers the
 # test-side cert generation. PEM is wire-stable across both crates.
 ssh-key     = { version = "0.6", features = ["ed25519", "rsa", "alloc", "p256", "p384", "rand_core", "getrandom", "std"] }
-rand        = "0.8"
 subtle      = "2"
 tempfile    = "3"
 assert_cmd  = "2"

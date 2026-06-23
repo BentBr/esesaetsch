@@ -165,8 +165,8 @@ pub fn pubkey_blob(openssh_line: &str) -> Vec<u8> {
 // Certificate test helpers
 // =====================================================================
 
-use rand::rngs::OsRng;
 use ssh_key::certificate::CertType;
+use ssh_key::rand_core::OsRng;
 use ssh_key::{Algorithm, PrivateKey};
 
 /// Generate a random Ed25519 private key for use as a test CA or user key.
