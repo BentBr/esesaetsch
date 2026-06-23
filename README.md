@@ -1,4 +1,4 @@
-# esesätsch
+![Esesätsch](./media/esesaetsch-wordmark.svg "Esesätsch")
 
 [![CI](https://github.com/BentBr/esesaetsch/actions/workflows/ci.yml/badge.svg)](https://github.com/BentBr/esesaetsch/actions/workflows/ci.yml)
 [![Release Please](https://github.com/BentBr/esesaetsch/actions/workflows/release-please.yml/badge.svg)](https://github.com/BentBr/esesaetsch/actions/workflows/release-please.yml)

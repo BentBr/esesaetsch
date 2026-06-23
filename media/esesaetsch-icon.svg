@@ -1,0 +1,18 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect x="48" y="48" width="416" height="416" rx="104" fill="#241A16"/>
+  <rect x="48" y="48" width="416" height="416" rx="104" fill="none" stroke="#C95E33" stroke-width="6"/>
+  <polyline points="180,170 270,256 180,342" fill="none" stroke="#D26B3F" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="298" y="240" width="96" height="44" rx="10" fill="#E89352"/>
+  <g transform="translate(372,164)" fill="#E89352">
+    <rect x="-7.2" y="-46" width="14.4" height="19" rx="3.5" transform="rotate(0)"/>
+    <rect x="-7.2" y="-46" width="14.4" height="19" rx="3.5" transform="rotate(45)"/>
+    <rect x="-7.2" y="-46" width="14.4" height="19" rx="3.5" transform="rotate(90)"/>
+    <rect x="-7.2" y="-46" width="14.4" height="19" rx="3.5" transform="rotate(135)"/>
+    <rect x="-7.2" y="-46" width="14.4" height="19" rx="3.5" transform="rotate(180)"/>
+    <rect x="-7.2" y="-46" width="14.4" height="19" rx="3.5" transform="rotate(225)"/>
+    <rect x="-7.2" y="-46" width="14.4" height="19" rx="3.5" transform="rotate(270)"/>
+    <rect x="-7.2" y="-46" width="14.4" height="19" rx="3.5" transform="rotate(315)"/>
+    <circle r="33"/>
+    <circle r="12.5" fill="#241A16"/>
+  </g>
+</svg>

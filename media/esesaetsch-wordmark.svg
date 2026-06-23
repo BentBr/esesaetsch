@@ -1,0 +1,22 @@
+<svg width="640" height="200" viewBox="0 0 640 200" xmlns="http://www.w3.org/2000/svg">
+  <title>esesätsch — horizontal lockup</title>
+  <rect x="20" y="36" width="128" height="128" rx="30" fill="#241A16"/>
+  <rect x="20" y="36" width="128" height="128" rx="30" fill="none" stroke="#C95E33" stroke-width="1.5"/>
+  <polyline points="62,78 90,100 62,122" fill="none" stroke="#D26B3F" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="100" y="104" width="30" height="14" rx="3" fill="#E89352"/>
+  <g transform="translate(124,62)" fill="#E89352">
+    <rect x="-2.3" y="-14.5" width="4.6" height="6" rx="1.1" transform="rotate(0)"/>
+    <rect x="-2.3" y="-14.5" width="4.6" height="6" rx="1.1" transform="rotate(45)"/>
+    <rect x="-2.3" y="-14.5" width="4.6" height="6" rx="1.1" transform="rotate(90)"/>
+    <rect x="-2.3" y="-14.5" width="4.6" height="6" rx="1.1" transform="rotate(135)"/>
+    <rect x="-2.3" y="-14.5" width="4.6" height="6" rx="1.1" transform="rotate(180)"/>
+    <rect x="-2.3" y="-14.5" width="4.6" height="6" rx="1.1" transform="rotate(225)"/>
+    <rect x="-2.3" y="-14.5" width="4.6" height="6" rx="1.1" transform="rotate(270)"/>
+    <rect x="-2.3" y="-14.5" width="4.6" height="6" rx="1.1" transform="rotate(315)"/>
+    <circle r="10.5"/>
+    <circle r="4" fill="#241A16"/>
+  </g>
+  <text x="182" y="98" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="46" font-weight="600" fill="#C95E33">esesätsch</text>
+  <text x="184" y="128" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="15" fill="#6B6B6B">drop-in ssh daemon, rewritten in rust</text>
+  <text x="184" y="152" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="13" fill="#C2814E">pronounced “es·es·ätsch” — ssh, with attitude</text>
+</svg>
