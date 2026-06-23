@@ -41,7 +41,7 @@ toml        = "0.8"
 clap        = { version = "4", features = ["derive"] }
 clap_complete = "4"
 clap_mangen   = "0.2"
-russh       = "0.60"
+russh       = "0.61"
 # russh 0.60 vendors its keys module (`russh::keys`); no separate
 # russh-keys crate. We still depend on `ssh-key` 0.6 directly because
 # it has a friendlier RNG-and-`Algorithm`-typed `PrivateKey::random` we
