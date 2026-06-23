@@ -22,5 +22,4 @@ ssh-key     = { workspace = true }
 subtle      = { workspace = true }
 
 [dev-dependencies]
-rand        = { workspace = true }
 tempfile    = { workspace = true }
