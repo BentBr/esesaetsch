@@ -58,6 +58,10 @@ Grab the archive for your platform from the [latest release](https://github.com/
 
 Each archive contains the `esesätsch` binary plus `LICENSE`, `NOTICE`, and `README.md`.
 
+Prefer a native package? Each release also ships `.deb`, `.rpm`, Arch
+`.pkg.tar.zst`, a macOS `.pkg`, and a Windows `.msi` for amd64 and arm64.
+See [`packaging/README.md`](packaging/README.md).
+
 ### 2. Extract and put it on your `$PATH`
 
 ```sh
@@ -105,6 +109,7 @@ Want to build from a checkout instead of using a release binary? See [`docs/deve
 | [User guide — Configuration](docs/user-guide/configuration.md) | Every TOML field with defaults, allowed values, and security notes |
 | [User guide — CLI reference](docs/user-guide/cli-reference.md) | Every subcommand and flag with runnable examples |
 | [Development guide](docs/development.md) | Build/test/release workflow, project layout, libclang setup per OS |
+| [`packaging/README.md`](packaging/README.md) | Native install packages, what they install, local builds |
 | [`examples/README.md`](examples/README.md) | Ready-to-edit example configs (minimal, pubkey-only, password, cert, full reference) |
 | [`docs/index.md`](docs/index.md) | Documentation hub |
 

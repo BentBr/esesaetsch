@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+    <title>esesätsch SSH server</title>
+    <options customize="never" require-scripts="true" hostArchitectures="arm64,x86_64"/>
+    <choices-outline>
+        <line choice="default">
+            <line choice="com.esesaetsch.server"/>
+        </line>
+    </choices-outline>
+    <choice id="default"/>
+    <choice id="com.esesaetsch.server" visible="false">
+        <pkg-ref id="com.esesaetsch.server"/>
+    </choice>
+    <pkg-ref id="com.esesaetsch.server" version="0">component.pkg</pkg-ref>
+</installer-gui-script>

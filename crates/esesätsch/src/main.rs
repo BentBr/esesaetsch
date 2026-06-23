@@ -7,7 +7,8 @@ use std::process::ExitCode;
 use std::sync::Arc;
 
 use anyhow::{Context, Result, anyhow};
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
+use clap_complete::Shell;
 use esesaetsch_core::auth::{
     AllowlistPubkeyAuthenticator, DenyAllPasswordAuthenticator, PasswordAuthenticator,
     PubkeyAuthenticator,
@@ -23,7 +24,11 @@ use real_pty::RealPtySpawner;
 use russh::server::Server;
 
 #[derive(Parser, Debug)]
-#[command(name = "esesätsch", about = "A strict cross-platform SSH server.")]
+#[command(
+    name = "esesätsch",
+    version,
+    about = "A strict cross-platform SSH server."
+)]
 #[allow(clippy::struct_excessive_bools)] // independent CLI flags
 struct Args {
     #[command(subcommand)]
@@ -71,6 +76,14 @@ enum Command {
     /// Remove the platform-native service unit installed by `install-service`.
     /// Requires root / Administrator privileges.
     UninstallService,
+    /// Print a shell completion script to stdout.
+    Completions {
+        /// Shell to generate completions for.
+        #[arg(value_enum)]
+        shell: Shell,
+    },
+    /// Print a man page (roff) to stdout.
+    Man,
 }
 
 fn main() -> ExitCode {
@@ -112,6 +125,18 @@ async fn run() -> Result<()> {
             service::install(&exe, args.config.as_deref())
         }
         Some(Command::UninstallService) => service::uninstall(),
+        Some(Command::Completions { shell }) => {
+            let mut cmd = Args::command();
+            let mut out = std::io::stdout();
+            clap_complete::generate(*shell, &mut cmd, "esesaetsch", &mut out);
+            Ok(())
+        }
+        Some(Command::Man) => {
+            let man = clap_mangen::Man::new(Args::command().name("esesaetsch"));
+            let mut out = std::io::stdout();
+            man.render(&mut out).context("rendering man page")?;
+            Ok(())
+        }
         Some(Command::Serve) | None => cmd_serve(&args).await,
     }
 }

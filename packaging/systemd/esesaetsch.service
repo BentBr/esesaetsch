@@ -1,0 +1,13 @@
+[Unit]
+Description=esesätsch SSH server
+Documentation=https://github.com/BentBr/esesaetsch
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/esesaetsch serve --config /etc/esesaetsch/config.toml
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

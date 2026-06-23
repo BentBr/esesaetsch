@@ -4,6 +4,15 @@ use assert_cmd::Command;
 use predicates::prelude::*;
 
 #[test]
+fn version_flag_succeeds() {
+    Command::cargo_bin("esesaetsch")
+        .unwrap()
+        .arg("--version")
+        .assert()
+        .success();
+}
+
+#[test]
 fn help_lists_subcommands() {
     Command::cargo_bin("esesaetsch")
         .unwrap()
@@ -140,4 +149,51 @@ fn serve_actually_listens_on_the_configured_port() {
     let _ = child.wait();
 
     assert!(connected, "server did not start listening on port {port}");
+}
+
+#[test]
+fn completions_bash_emits_a_script() {
+    Command::cargo_bin("esesaetsch")
+        .unwrap()
+        .args(["completions", "bash"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("esesaetsch"))
+        .stdout(predicate::str::contains("complete"));
+}
+
+#[test]
+fn completions_supports_zsh_and_fish() {
+    Command::cargo_bin("esesaetsch")
+        .unwrap()
+        .args(["completions", "zsh"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("_esesaetsch"));
+    Command::cargo_bin("esesaetsch")
+        .unwrap()
+        .args(["completions", "fish"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("esesaetsch"));
+}
+
+#[test]
+fn completions_rejects_unknown_shell() {
+    Command::cargo_bin("esesaetsch")
+        .unwrap()
+        .args(["completions", "tcsh"])
+        .assert()
+        .failure();
+}
+
+#[test]
+fn man_emits_roff_with_the_program_name() {
+    Command::cargo_bin("esesaetsch")
+        .unwrap()
+        .arg("man")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(".TH"))
+        .stdout(predicate::str::contains("esesaetsch"));
 }
