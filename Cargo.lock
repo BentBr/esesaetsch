@@ -967,7 +967,7 @@ dependencies = [
 name = "esesaetsch-core"
 version = "0.2.0"
 dependencies = [
- "rand 0.8.6",
+ "rand 0.10.1",
  "russh",
  "serde",
  "ssh-key",
