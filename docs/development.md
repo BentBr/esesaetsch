@@ -146,6 +146,10 @@ Releases are fully automated by [release-please](https://github.com/googleapis/r
 4. Merge the release PR. release-please publishes a tagged GitHub Release.
 5. `release-assets.yml` builds and attaches binaries for all 5 targets.
 
+Native packages (deb/rpm/Arch/apk/macOS pkg/Windows msi) are built and
+attached by `release-packages.yml` in the same release flow. See
+[`packaging/README.md`](../packaging/README.md) to build one locally.
+
 You don't manually edit `Cargo.toml`'s version or write `CHANGELOG.md` entries — release-please does both.
 
 ## Test coverage

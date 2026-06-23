@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+    <Product
+        Id="*"
+        Name="esesaetsch SSH server"
+        UpgradeCode="7C9B6F2E-4A1D-4E3B-9F8C-2D5A6B7C8E90"
+        Manufacturer="Bent Brüggemann"
+        Language="1033"
+        Codepage="1252"
+        Version="$(var.Version)">
+
+        <Package Id="*"
+            Keywords="Installer"
+            Description="esesaetsch SSH server"
+            Manufacturer="Bent Brüggemann"
+            InstallerVersion="450"
+            Languages="1033"
+            Compressed="yes"
+            InstallScope="perMachine"
+            SummaryCodepage="1252"/>
+
+        <MajorUpgrade
+            Schedule="afterInstallInitialize"
+            DowngradeErrorMessage="A newer version of esesaetsch is already installed."/>
+        <MediaTemplate EmbedCab="yes"/>
+
+        <Directory Id="TARGETDIR" Name="SourceDir">
+            <Directory Id="ProgramFiles64Folder">
+                <Directory Id="APPLICATIONFOLDER" Name="esesaetsch">
+                    <Component Id="MainExecutable" Guid="*" Win64="yes">
+                        <File Id="esesaetschExe"
+                            Name="esesaetsch.exe"
+                            Source="$(var.CargoTargetBinDir)\esesaetsch.exe"
+                            KeyPath="yes"/>
+                        <Environment Id="UpdatePath"
+                            Name="PATH"
+                            Value="[APPLICATIONFOLDER]"
+                            Permanent="no"
+                            Part="last"
+                            Action="set"
+                            System="yes"/>
+                        <ServiceInstall Id="EsesaetschService"
+                            Type="ownProcess"
+                            Name="esesaetsch"
+                            DisplayName="esesätsch SSH server"
+                            Description="esesätsch SSH server"
+                            Start="auto"
+                            Account="LocalSystem"
+                            ErrorControl="normal"
+                            Arguments="serve --config &quot;[CommonAppDataFolder]esesaetsch\config.toml&quot;"/>
+                        <ServiceControl Id="EsesaetschServiceControl"
+                            Name="esesaetsch"
+                            Stop="both"
+                            Remove="uninstall"
+                            Wait="yes"/>
+                    </Component>
+                </Directory>
+            </Directory>
+        </Directory>
+
+        <Feature Id="Complete" Level="1" Title="esesaetsch" Display="expand">
+            <ComponentRef Id="MainExecutable"/>
+        </Feature>
+    </Product>
+</Wix>

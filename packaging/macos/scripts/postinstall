@@ -1,0 +1,13 @@
+#!/bin/sh
+# Generate a host key if absent; do not auto-load the daemon.
+set -e
+
+KEY=/etc/esesaetsch/host_key
+if [ ! -e "$KEY" ]; then
+    /usr/local/bin/esesaetsch gen-key --host-key "$KEY"
+    chmod 600 "$KEY"
+fi
+
+echo "esesätsch installed. Add your keys to /etc/esesaetsch/config.toml, then:"
+echo "    sudo launchctl load -w /Library/LaunchDaemons/com.esesaetsch.server.plist"
+exit 0

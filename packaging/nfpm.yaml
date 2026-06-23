@@ -1,0 +1,71 @@
+name: esesaetsch
+arch: ${PKG_ARCH}
+version: ${VERSION}
+version_schema: none
+maintainer: Bent Brüggemann <noreply@github.com>, Pierre Jochem <noreply@github.com>
+description: A strict, cross-platform SSH server.
+homepage: https://github.com/BentBr/esesaetsch
+license: Apache-2.0
+section: net
+priority: optional
+
+depends: []
+
+overrides:
+  deb:
+    depends:
+      - libpam0g
+  rpm:
+    depends:
+      - pam
+  archlinux:
+    depends:
+      - pam
+
+contents:
+  - src: ./dist/esesaetsch
+    dst: /usr/bin/esesaetsch
+    file_info:
+      mode: 0755
+  - src: ./packaging/systemd/esesaetsch.service
+    dst: /usr/lib/systemd/system/esesaetsch.service
+    file_info:
+      mode: 0644
+  - src: ./packaging/config/esesaetsch.toml
+    dst: /etc/esesaetsch/config.toml
+    type: "config|noreplace"
+    file_info:
+      mode: 0644
+  - src: ./dist/esesaetsch.1.gz
+    dst: /usr/share/man/man1/esesaetsch.1.gz
+    file_info:
+      mode: 0644
+  - src: ./dist/completions/esesaetsch.bash
+    dst: /usr/share/bash-completion/completions/esesaetsch
+    file_info:
+      mode: 0644
+  - src: ./dist/completions/_esesaetsch
+    dst: /usr/share/zsh/site-functions/_esesaetsch
+    file_info:
+      mode: 0644
+  - src: ./dist/completions/esesaetsch.fish
+    dst: /usr/share/fish/vendor_completions.d/esesaetsch.fish
+    file_info:
+      mode: 0644
+  - src: ./LICENSE
+    dst: /usr/share/doc/esesaetsch/LICENSE
+    file_info:
+      mode: 0644
+  - src: ./NOTICE
+    dst: /usr/share/doc/esesaetsch/NOTICE
+    file_info:
+      mode: 0644
+  - src: ./README.md
+    dst: /usr/share/doc/esesaetsch/README.md
+    file_info:
+      mode: 0644
+
+scripts:
+  postinstall: ./packaging/scripts/postinstall.sh
+  preremove: ./packaging/scripts/preremove.sh
+  postremove: ./packaging/scripts/postremove.sh
