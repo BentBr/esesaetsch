@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/BentBr/esesaetsch/compare/v0.3.0...v0.4.0) (2026-06-24)
+
+
+### Features
+
+* add icons, palette colors and use logo in README.md ([ffa667d](https://github.com/BentBr/esesaetsch/commit/ffa667d13d061fd841953e3d4f6311fd8bbf4bf0))
+* add icons, palette colors and use logo in README.md ([61fdeff](https://github.com/BentBr/esesaetsch/commit/61fdeffc052d40804cc404e351fd0b32c08f5b5d))
+
 ## [0.3.0](https://github.com/BentBr/esesaetsch/compare/v0.2.0...v0.3.0) (2026-06-23)
 
 
