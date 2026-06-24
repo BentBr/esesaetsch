@@ -55,7 +55,7 @@ jobs:
             bin-ext: .exe
             install: windows
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # @nightly matches rust-toolchain.toml — the `targets:` parameter
       # only adds the target to the toolchain it installs, so it must

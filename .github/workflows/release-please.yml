@@ -24,7 +24,7 @@ jobs:
       prs:             ${{ steps.release.outputs.prs }}
       pr_head_sha:     ${{ steps.get-pr-sha.outputs.sha }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@v5
         id: release
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -34,7 +34,7 @@ jobs:
       - name: Get PR head SHA (for status reporting)
         id: get-pr-sha
         if: ${{ steps.release.outputs.prs_created == 'true' }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           PRS_OUTPUT: ${{ steps.release.outputs.prs }}
         with:
@@ -67,7 +67,7 @@ jobs:
     if: ${{ always() && needs.release-please.outputs.pr_head_sha != '' && needs.release-please.outputs.release_created != 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@v9
         env:
           SHA:       ${{ needs.release-please.outputs.pr_head_sha }}
           CI_RESULT: ${{ needs.ci-for-release-pr.result }}
